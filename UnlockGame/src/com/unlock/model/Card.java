@@ -30,6 +30,8 @@ public class Card implements Serializable {
     public String getDescription() { return description; }
     public boolean isVisible() { return isVisible; }
     public void setVisible(boolean visible) { this.isVisible = visible; }
+    public String getImagePath() { return imagePath; }
+    public void setImagePath(String imagePath) { this.imagePath = imagePath; }
 
     @Override
     public String toString() {

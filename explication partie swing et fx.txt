@@ -1,0 +1,42 @@
+explication partie swing :
+
+1. Pour la partie Swing (L'application compagnon)
+Fichier à présenter : 
+
+src/com/unlock/gui/swing/AppCompanion.java
+
+Pourquoi ? C'est le cœur de ton interface Swing. Ce fichier montre :
+La création d'une interface fenêtrée classique avec JFrame, JPanel, JLabel, et JButton.
+L'utilisation des gestionnaires de mise en page (Layout Managers) comme BorderLayout et GridLayout (pour le pavé numérique).
+La gestion des événements (ActionListeners) pour les clics sur les boutons du pavé numérique.
+L'utilisation d'un javax.swing.Timer asynchrone pour gérer le chronomètre (60 minutes qui s'écoulent).
+
+
+explication partie fx :
+
+2. Pour la partie JavaFX (La table de jeu principale)
+Tu as deux excellents fichiers qui montrent des concepts différents et avancés de JavaFX. Je te conseille de présenter soit les deux, soit de choisir celui avec lequel tu es le plus à l'aise :
+
+Fichier A : 
+
+src/com/unlock/gui/javafx/TableJeuController.java
+
+Pourquoi ? Il montre la logique de contrôle (le "C" de MVC) intégrée avec JavaFX :
+L'utilisation des annotations @FXML pour lier le code Java aux éléments de l'interface définis dans 
+
+TableJeu.fxml
+.
+La manipulation dynamique du graphe de scène (Scene Graph) en ajoutant/retirant des cartes (cardsContainer.getChildren().clear(), etc.).
+Le point fort techniquement : La gestion complète du Drag & Drop (glisser-déposer) pour combiner deux cartes (setOnDragOver, setOnDragDropped), ce qui est une fonctionnalité avancée très intéressante à montrer en soutenance.
+Fichier B : 
+
+src/com/unlock/gui/javafx/CardView.java
+
+Pourquoi ? Il montre comment créer un composant graphique personnalisé à partir de zéro :
+L'héritage d'un conteneur JavaFX standard (VBox).
+L'application de styles CSS en ligne (setStyle) pour les bordures, ombres et couleurs.
+Le chargement dynamique d'images (
+
+Image
+, ImageView) selon les ressources.
+L'interaction souris : le survol (Hover avec setOnMouseEntered) et les événements de double-clic pour la mécanique de "fouille".

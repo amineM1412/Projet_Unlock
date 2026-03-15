@@ -1,0 +1,8 @@
+C:\Users\moham\Desktop\info0203\UnlockGame\src\com\unlock\core\GameEngine.java
+C:\Users\moham\Desktop\info0203\UnlockGame\src\com\unlock\core\Main.java
+C:\Users\moham\Desktop\info0203\UnlockGame\src\com\unlock\gui\javafx\CardView.java
+C:\Users\moham\Desktop\info0203\UnlockGame\src\com\unlock\gui\javafx\JavaFXMain.java
+C:\Users\moham\Desktop\info0203\UnlockGame\src\com\unlock\gui\javafx\TableJeuController.java
+C:\Users\moham\Desktop\info0203\UnlockGame\src\com\unlock\gui\swing\AppCompanion.java
+C:\Users\moham\Desktop\info0203\UnlockGame\src\com\unlock\model\Card.java
+C:\Users\moham\Desktop\info0203\UnlockGame\src\com\unlock\model\CardType.java
