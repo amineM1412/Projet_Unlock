@@ -1,7 +1,5 @@
 package com.unlock.model;
 
-import java.io.Serializable;
-
 public class Card {
 
     private int id; // Ex: 10, 6, 24, 30...
@@ -13,8 +11,8 @@ public class Card {
     public Card(int id, CardType type, String description) {
         this.id = id;
 
-        this.description = description;
-        this.isVisible = false; // Initialisation explicite pour la clarté
+        this.description = desc
+
         this.imagePath = null; // Par défaut, pas d'image
     }
     
@@ -29,28 +27,23 @@ public class Card {
 
     public String getDescription() {
         return description;
-    }
+    }ic boolean i
 
-
-    
-    public boolean isVisible(){
         return isVisible
-        
-    
-
     }
+
 
     public void setVisible(boolean vsible) {
-    
-        this.isVisible = visible ;   
-    }
-        
-    
 
+        this.isVisible = visible ;   
+
+    }
+
+    
     public String getImagePath() {
         return imagePath;
     }
-
+    
     public void setImagePath(String imagePath) {
         this.imagePath = imagePath;
     }

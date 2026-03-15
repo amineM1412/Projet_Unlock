@@ -1,12 +1,7 @@
-package com.unlock.gui.swing;
-
-import com.unlock.core.GameEngine;
-import com.unlock.model.Card;
 
 import javax.swing.*;
-import java.awt.*;
 
-public class AppCompanion extends JFrame {
+public class AppCompanion {
 
     private GameEngine engine;
     private JLabel timerLabel;
@@ -56,14 +51,14 @@ public class AppCompanion extends JFrame {
 
     private JButton createNumButton(String text) {
         JButton btn = new JButton(text);
-        btn.setFont(new Font("Arial", Font.BOLD, 20));
+
         btn.addActionListener(e -> {
             if (text.equals("C")) {
                 codeField.setText("");
             } else {
                 codeField.setText(codeField.getText() + text);
             }
-        });
+
         return btn;
     }
 
