@@ -12,8 +12,8 @@ import java.util.Map;
 public class GameEngine {
 
     // Temps restant en secondes (défaut : 60 min)
-    private int timeRemaining = 3600; 
-    
+    private int timeRemaining = 3600;
+
     // Le paquet de cartes disponibles (Id -> Carte)
     private Map<Integer, Card> deck;
 
@@ -23,7 +23,7 @@ public class GameEngine {
     }
 
     /**
-     * Initialise le scénario minimal dicté dans le cours/documents.
+     * Initialise le scénario minimal pour l'instant
      */
     private void initScenarioStationSpatiale() {
         // La carte 10 est visible par défaut au début du jeu
@@ -70,9 +70,9 @@ public class GameEngine {
                 }
             }
         }
-        
+
         // Si la combinaison est invalide, pénalité de 30sec
-        applyPenalty(30); 
+        applyPenalty(30);
         return null;
     }
 
@@ -94,12 +94,14 @@ public class GameEngine {
 
     /**
      * Applique une pénalité de temps au joueur.
+     * 
      * @param penaltySeconds nombre de secondes à retirer
      */
     public void applyPenalty(int penaltySeconds) {
         System.out.println("❌ PENALITE : -" + penaltySeconds + " secondes !");
         timeRemaining -= penaltySeconds;
-        if (timeRemaining < 0) timeRemaining = 0;
+        if (timeRemaining < 0)
+            timeRemaining = 0;
     }
 
     public int getTimeRemaining() {

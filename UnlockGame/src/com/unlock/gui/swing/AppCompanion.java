@@ -30,12 +30,37 @@ public class AppCompanion extends JFrame {
         setLayout(new BorderLayout());
 
         // --- HAUT : CHRONOMETRE ---
-        JPanel topPanel = new JPanel();
+        JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setBackground(Color.DARK_GRAY);
+        
         timerLabel = new JLabel("60:00", SwingConstants.CENTER);
         timerLabel.setFont(new Font("Monospaced", Font.BOLD, 48));
         timerLabel.setForeground(Color.RED);
-        topPanel.add(timerLabel);
+        topPanel.add(timerLabel, BorderLayout.CENTER);
+
+        // Ajout des boutons Start et Stop
+        JPanel timerBtnPanel = new JPanel(new FlowLayout());
+        timerBtnPanel.setOpaque(false);
+        
+        JButton startBtn = new JButton("▶ Start");
+        JButton stopBtn = new JButton("⏸ Stop");
+        
+        startBtn.addActionListener(e -> {
+            if (clockTimer != null && !clockTimer.isRunning()) {
+                clockTimer.start();
+            }
+        });
+        
+        stopBtn.addActionListener(e -> {
+            if (clockTimer != null && clockTimer.isRunning()) {
+                clockTimer.stop();
+            }
+        });
+        
+        timerBtnPanel.add(startBtn);
+        timerBtnPanel.add(stopBtn);
+        topPanel.add(timerBtnPanel, BorderLayout.SOUTH);
+        
         add(topPanel, BorderLayout.NORTH);
 
         // --- CENTRE : PAVE NUMERIQUE ---

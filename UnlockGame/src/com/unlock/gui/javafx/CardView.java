@@ -1,6 +1,8 @@
 package com.unlock.gui.javafx;
 
 import com.unlock.model.Card;
+import javafx.event.Event;
+import javafx.event.EventType;
 import javafx.geometry.Insets;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
@@ -15,20 +17,32 @@ import javafx.scene.text.FontWeight;
  */
 public class CardView extends VBox {
 
-    private Card card;
+    // Événement personnalisé déclenché lors d'un double-clic sur la carte
+    public static final EventType<Event> CARD_SELECTED = new EventType<>(Event.ANY, "CARD_SELECTED");
+
+    private final Card card;
+
+    // Style de base conservé pour le hover (évite la corruption du style CSS)
+    private final String baseStyle;
 
     public CardView(Card card) {
         this.card = card;
 
-        // Style de base de la carte (100x150 pixels)
+        // Style de base de la carte (120x180 pixels)
         this.setPrefSize(120, 180);
         this.setPadding(new Insets(10));
         this.setSpacing(5);
-        this.setStyle(
-                "-fx-background-color: white; -fx-background-radius: 10; -fx-border-radius: 10; -fx-border-color: #888888; -fx-border-width: 2; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 5, 0, 2, 2);");
+        this.baseStyle =
+                "-fx-background-color: white;" +
+                "-fx-background-radius: 10;" +
+                "-fx-border-radius: 10;" +
+                "-fx-border-color: #888888;" +
+                "-fx-border-width: 2;" +
+                "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 5, 0, 2, 2);";
+        this.setStyle(baseStyle);
 
-        // Application de la couleur d'en-tête selon le type (Rouge/Bleu/Neutre/Machine)
-        String colorHex = "#9E9E9E"; // Gris neutre
+        // Couleur selon le type de carte
+        String colorHex;
         switch (card.getType()) {
             case ROUGE:
                 colorHex = "#F44336";
@@ -42,13 +56,21 @@ public class CardView extends VBox {
             case RESULTAT:
                 colorHex = "#FFC107";
                 break;
+            case CODE:
+                colorHex = "#FF9800";
+                break;
+            case PENALITE:
+                colorHex = "#9C27B0";
+                break;
+            case NEUTRE:
             default:
+                colorHex = "#9E9E9E";
                 break;
         }
 
         // Label du Numéro (ID)
         Label idLabel = new Label(String.valueOf(card.getId()));
-        idLabel.setFont(Font.font("System", FontWeight.BOLD, 24));
+        idLabel.setFont(Font.font("Arial", FontWeight.BOLD, 24));
         idLabel.setTextFill(Color.web(colorHex));
         idLabel.setMaxWidth(Double.MAX_VALUE);
         idLabel.setStyle("-fx-alignment: center;");
@@ -56,7 +78,6 @@ public class CardView extends VBox {
         // Zone centrale : Image ou Texte
         if (card.getImagePath() != null && !card.getImagePath().isEmpty()) {
             try {
-                // On utilise le classloader pour charger l'image depuis les ressources
                 String fullPath = "/com/unlock/resources/images/" + card.getImagePath();
                 Image img = new Image(getClass().getResourceAsStream(fullPath));
                 ImageView imgView = new ImageView(img);
@@ -65,18 +86,17 @@ public class CardView extends VBox {
                 imgView.setPreserveRatio(true);
                 this.getChildren().addAll(idLabel, imgView);
             } catch (Exception ex) {
-                // Fallback texte si introuvable
+                // Fallback texte si image introuvable
                 Label descLabel = new Label(card.getDescription() + "\n(Image indispo)");
                 descLabel.setWrapText(true);
-                descLabel.setFont(Font.font("System", 11));
+                descLabel.setFont(Font.font("Arial", 11));
                 descLabel.setStyle("-fx-alignment: top-center;");
                 this.getChildren().addAll(idLabel, descLabel);
             }
         } else {
-            // Label pour le texte/description basique
             Label descLabel = new Label(card.getDescription());
             descLabel.setWrapText(true);
-            descLabel.setFont(Font.font("System", 12));
+            descLabel.setFont(Font.font("Arial", 12));
             descLabel.setMaxWidth(Double.MAX_VALUE);
             descLabel.setMaxHeight(Double.MAX_VALUE);
             descLabel.setStyle("-fx-alignment: top-center;");
@@ -85,15 +105,17 @@ public class CardView extends VBox {
 
         final String finalColorHex = colorHex;
 
-        // Interaction visuelle (Hover)
-        this.setOnMouseEntered(e -> this.setStyle(this.getStyle() + "-fx-border-color: " + finalColorHex + "; -fx-border-width: 3;"));
-        this.setOnMouseExited(e -> this.setStyle(this.getStyle().replace("-fx-border-color: " + finalColorHex + "; -fx-border-width: 3;", "")));
+        // Interaction Hover : utilise baseStyle pour éviter la corruption du CSS
+        this.setOnMouseEntered(e -> this.setStyle(
+                baseStyle +
+                "-fx-border-color: " + finalColorHex + ";" +
+                "-fx-border-width: 3;"));
+        this.setOnMouseExited(e -> this.setStyle(baseStyle));
 
-        // Action de Fouille (Double-clic pour observer un lieu ou chercher un numéro caché)
+        // Double-clic : déclenche l'événement CARD_SELECTED (capté dans TableJeuController)
         this.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) {
-                // Émettre un événement personnalisé qu'on capte dans TableJeuController
-                this.fireEvent(new javafx.event.Event(javafx.event.EventType.ROOT));
+                this.fireEvent(new Event(CARD_SELECTED));
             }
         });
     }

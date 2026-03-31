@@ -11,7 +11,7 @@ public class JavaFXMain extends Application {
 
     private static GameEngine engine;
 
-    // Permet au Launcher externe (ou à Swing) de passer le moteur
+    // Permet au Launcher au Swing de passer le moteur
     public static void setGameEngine(GameEngine eng) {
         engine = eng;
     }

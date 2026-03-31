@@ -1,3 +1,4 @@
+// Fichier pour le contrôleur JavaFX
 package com.unlock.gui.javafx;
 
 import com.unlock.core.GameEngine;
@@ -12,8 +13,10 @@ import javafx.scene.input.TransferMode;
 
 public class TableJeuController {
 
-    @FXML private FlowPane cardsContainer;
-    @FXML private HBox combinationZone;
+    @FXML
+    private FlowPane cardsContainer;
+    @FXML
+    private HBox combinationZone;
     private Label comboInstructionLabel;
 
     // Instance partagée (ou globale) du moteur
@@ -39,29 +42,32 @@ public class TableJeuController {
     }
 
     /**
-     * Rafraîchit l'affichage en ne montrant que les cartes "visibles" dans le GameEngine.
+     * Rafraîchit l'affichage en ne montrant que les cartes "visibles" dans le
+     * GameEngine.
      */
     public void refreshTable() {
-        if (engine == null) return;
+        if (engine == null)
+            return;
         cardsContainer.getChildren().clear();
 
         for (Card c : engine.getDeck().values()) {
             if (c.isVisible()) {
                 CardView cv = new CardView(c);
                 enableDragDropOnCard(cv);
-                
+
                 // Écoute de l'événement de fouille (Double clic configuré dans CardView)
-                cv.addEventHandler(javafx.event.EventType.ROOT, e -> {
+                cv.addEventHandler(CardView.CARD_SELECTED, e -> {
                     handleCardFouille(cv.getCard());
                 });
-                
+
                 cardsContainer.getChildren().add(cv);
             }
         }
     }
 
     /**
-     * Logique de fouille (ex: on double-clic sur le lieu 10, ça dévoile le 6 et le 24)
+     * Logique de fouille (ex: on double-clic sur le lieu 10, ça dévoile le 6 et le
+     * 24)
      */
     private void handleCardFouille(Card cardToFouille) {
         if (cardToFouille.getId() == 10) {
@@ -78,7 +84,7 @@ public class TableJeuController {
                 hidden24.setVisible(true);
                 changed = true;
             }
-            
+
             if (changed) {
                 comboInstructionLabel.setText("🔎 Vous avez trouvé de nouveaux objets !");
                 refreshTable();
@@ -119,20 +125,22 @@ public class TableJeuController {
             if (db.hasString()) {
                 int cardId = Integer.parseInt(db.getString());
                 Card droppedCard = engine.getDeck().get(cardId);
-                
+
                 if (cardToCombine1 == null) {
                     cardToCombine1 = droppedCard;
                     comboInstructionLabel.setText("Carte " + cardId + " en attente. Glissez la 2ème carte.");
                 } else {
-                    // Try to combine
+                    // combinaison invalide
                     Card result = engine.combineCards(cardToCombine1.getId(), droppedCard.getId());
                     if (result != null) {
-                        comboInstructionLabel.setText("Réussite ! " + cardToCombine1.getId() + " + " + droppedCard.getId() + " = " + result.getId());
+                        comboInstructionLabel.setText("Réussite ! " + cardToCombine1.getId() + " + "
+                                + droppedCard.getId() + " = " + result.getId());
                     } else {
-                        comboInstructionLabel.setText("Erreur ! " + cardToCombine1.getId() + " + " + droppedCard.getId() + " => Pénalité !");
+                        comboInstructionLabel.setText(
+                                "Erreur ! " + cardToCombine1.getId() + " + " + droppedCard.getId() + " => Pénalité !");
                     }
                     cardToCombine1 = null; // Reset
-                    refreshTable(); // Add the new card if any
+                    refreshTable(); // vide la zone
                 }
                 success = true;
             }
