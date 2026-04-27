@@ -1,0 +1,1 @@
+typeSearchIndex = [{"l":"All Classes and Interfaces","u":"allclasses-index.html","k":"18"},{"p":"secret_message","l":"ReadSecretMessage"},{"p":"secret_message","l":"SecretMessage"},{"p":"secret_message","l":"WriteSecretMessage"}];updateSearchResults();
