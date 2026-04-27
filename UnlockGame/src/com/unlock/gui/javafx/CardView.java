@@ -1,9 +1,11 @@
 package com.unlock.gui.javafx;
 
 import com.unlock.model.Card;
+import com.unlock.model.CardType;
 import javafx.event.Event;
 import javafx.event.EventType;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -14,66 +16,80 @@ import javafx.scene.text.FontWeight;
 
 /**
  * Vue graphique d'une Carte (JavaFX).
+ * Supporte tous les types de cartes avec les bonnes couleurs.
  */
 public class CardView extends VBox {
 
-    // Événement personnalisé déclenché lors d'un double-clic sur la carte
     public static final EventType<Event> CARD_SELECTED = new EventType<>(Event.ANY, "CARD_SELECTED");
 
     private final Card card;
-
-    // Style de base conservé pour le hover (évite la corruption du style CSS)
     private final String baseStyle;
 
     public CardView(Card card) {
         this.card = card;
 
-        // Style de base de la carte (120x180 pixels)
-        this.setPrefSize(120, 180);
-        this.setPadding(new Insets(10));
-        this.setSpacing(5);
+        this.setPrefSize(130, 190);
+        this.setPadding(new Insets(8));
+        this.setSpacing(4);
+        this.setAlignment(Pos.TOP_CENTER);
+
+        String colorHex;
+        String bgGradient;
+        switch (card.getType()) {
+            case ROUGE:
+                colorHex = "#E53935";
+                bgGradient = "linear-gradient(to bottom, #ffebee, #ffffff)";
+                break;
+            case BLEU:
+                colorHex = "#1E88E5";
+                bgGradient = "linear-gradient(to bottom, #e3f2fd, #ffffff)";
+                break;
+            case MACHINE:
+                colorHex = "#43A047";
+                bgGradient = "linear-gradient(to bottom, #e8f5e9, #ffffff)";
+                break;
+            case CODE:
+                colorHex = "#FFC107";
+                bgGradient = "linear-gradient(to bottom, #fff8e1, #ffffff)";
+                break;
+            case RESULTAT:
+                colorHex = "#FFD700";
+                bgGradient = "linear-gradient(to bottom, #fffde7, #fff9c4)";
+                break;
+            case PENALITE:
+                colorHex = "#9C27B0";
+                bgGradient = "linear-gradient(to bottom, #f3e5f5, #ffffff)";
+                break;
+            case NEUTRE:
+            default:
+                colorHex = "#78909C";
+                bgGradient = "linear-gradient(to bottom, #eceff1, #ffffff)";
+                break;
+        }
+
         this.baseStyle =
-                "-fx-background-color: white;" +
+                "-fx-background-color: " + bgGradient + ";" +
                 "-fx-background-radius: 10;" +
                 "-fx-border-radius: 10;" +
-                "-fx-border-color: #888888;" +
+                "-fx-border-color: " + colorHex + ";" +
                 "-fx-border-width: 2;" +
                 "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.3), 5, 0, 2, 2);";
         this.setStyle(baseStyle);
 
-        // Couleur selon le type de carte
-        String colorHex;
-        switch (card.getType()) {
-            case ROUGE:
-                colorHex = "#F44336";
-                break;
-            case BLEU:
-                colorHex = "#2196F3";
-                break;
-            case MACHINE:
-                colorHex = "#4CAF50";
-                break;
-            case RESULTAT:
-                colorHex = "#FFC107";
-                break;
-            case CODE:
-                colorHex = "#FF9800";
-                break;
-            case PENALITE:
-                colorHex = "#9C27B0";
-                break;
-            case NEUTRE:
-            default:
-                colorHex = "#9E9E9E";
-                break;
-        }
-
-        // Label du Numéro (ID)
+        // Label du Numero (ID)
         Label idLabel = new Label(String.valueOf(card.getId()));
-        idLabel.setFont(Font.font("Arial", FontWeight.BOLD, 24));
+        idLabel.setFont(Font.font("Arial", FontWeight.BOLD, 22));
         idLabel.setTextFill(Color.web(colorHex));
         idLabel.setMaxWidth(Double.MAX_VALUE);
-        idLabel.setStyle("-fx-alignment: center;");
+        idLabel.setAlignment(Pos.CENTER);
+
+        // Badge du type
+        String typeTag = getTypeTag(card.getType());
+        Label typeLabel = new Label(typeTag);
+        typeLabel.setFont(Font.font("Arial", FontWeight.BOLD, 9));
+        typeLabel.setTextFill(Color.web("#666666"));
+        typeLabel.setMaxWidth(Double.MAX_VALUE);
+        typeLabel.setAlignment(Pos.CENTER);
 
         // Zone centrale : Image ou Texte
         if (card.getImagePath() != null && !card.getImagePath().isEmpty()) {
@@ -81,43 +97,66 @@ public class CardView extends VBox {
                 String fullPath = "/com/unlock/resources/images/" + card.getImagePath();
                 Image img = new Image(getClass().getResourceAsStream(fullPath));
                 ImageView imgView = new ImageView(img);
-                imgView.setFitWidth(100);
-                imgView.setFitHeight(115);
+                imgView.setFitWidth(110);
+                imgView.setFitHeight(110);
                 imgView.setPreserveRatio(true);
-                this.getChildren().addAll(idLabel, imgView);
+                this.getChildren().addAll(idLabel, typeLabel, imgView);
             } catch (Exception ex) {
-                // Fallback texte si image introuvable
-                Label descLabel = new Label(card.getDescription() + "\n(Image indispo)");
-                descLabel.setWrapText(true);
-                descLabel.setFont(Font.font("Arial", 11));
-                descLabel.setStyle("-fx-alignment: top-center;");
-                this.getChildren().addAll(idLabel, descLabel);
+                Label descLabel = createDescriptionLabel(card.getDescription());
+                this.getChildren().addAll(idLabel, typeLabel, descLabel);
             }
         } else {
-            Label descLabel = new Label(card.getDescription());
-            descLabel.setWrapText(true);
-            descLabel.setFont(Font.font("Arial", 12));
-            descLabel.setMaxWidth(Double.MAX_VALUE);
-            descLabel.setMaxHeight(Double.MAX_VALUE);
-            descLabel.setStyle("-fx-alignment: top-center;");
-            this.getChildren().addAll(idLabel, descLabel);
+            Label descLabel = createDescriptionLabel(card.getDescription());
+            this.getChildren().addAll(idLabel, typeLabel, descLabel);
         }
 
         final String finalColorHex = colorHex;
 
-        // Interaction Hover : utilise baseStyle pour éviter la corruption du CSS
+        // Hover effect
         this.setOnMouseEntered(e -> this.setStyle(
                 baseStyle +
                 "-fx-border-color: " + finalColorHex + ";" +
-                "-fx-border-width: 3;"));
+                "-fx-border-width: 3;" +
+                "-fx-effect: dropshadow(three-pass-box, " + finalColorHex + "44, 10, 0, 0, 0);"));
         this.setOnMouseExited(e -> this.setStyle(baseStyle));
 
-        // Double-clic : déclenche l'événement CARD_SELECTED (capté dans TableJeuController)
+        // Double-clic : CARD_SELECTED
         this.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) {
                 this.fireEvent(new Event(CARD_SELECTED));
             }
         });
+    }
+
+    private Label createDescriptionLabel(String text) {
+        String displayText = text;
+        if (text.contains("\u2014")) {
+            displayText = text.substring(text.indexOf("\u2014") + 1).trim();
+        }
+        if (displayText.length() > 60) {
+            displayText = displayText.substring(0, 57) + "...";
+        }
+
+        Label descLabel = new Label(displayText);
+        descLabel.setWrapText(true);
+        descLabel.setFont(Font.font("Arial", 10));
+        descLabel.setMaxWidth(Double.MAX_VALUE);
+        descLabel.setMaxHeight(Double.MAX_VALUE);
+        descLabel.setAlignment(Pos.TOP_CENTER);
+        descLabel.setStyle("-fx-text-fill: #333333;");
+        return descLabel;
+    }
+
+    private String getTypeTag(CardType type) {
+        switch (type) {
+            case BLEU: return "[BLEU] Objet";
+            case ROUGE: return "[ROUGE] Objet";
+            case MACHINE: return "[VERT] Machine";
+            case CODE: return "[JAUNE] Code";
+            case RESULTAT: return "[RESULTAT]";
+            case PENALITE: return "[PENALITE]";
+            default: return "[GRIS] Lieu";
+        }
     }
 
     public Card getCard() {

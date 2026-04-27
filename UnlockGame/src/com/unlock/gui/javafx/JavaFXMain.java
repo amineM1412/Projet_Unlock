@@ -1,5 +1,4 @@
 package com.unlock.gui.javafx;
-
 import com.unlock.core.GameEngine;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -28,8 +27,8 @@ public class JavaFXMain extends Application {
         }
         controller.setGameEngine(engine);
 
-        primaryStage.setTitle("Unlock! - Table de Jeu (JavaFX)");
-        primaryStage.setScene(new Scene(root, 800, 600));
+        primaryStage.setTitle("Unlock! - Station Heliox-7");
+        primaryStage.setScene(new Scene(root, 1100, 700));
         primaryStage.show();
     }
 

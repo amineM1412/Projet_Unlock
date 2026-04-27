@@ -1,0 +1,6 @@
+probleme a regler sur le jeu unlock :
+
+- le mini jeu des frequences aucun boutton de validation
+- la carte 35 et la carte 44 done le meme indice
+- mini jeu 25 reussi mais carte ne disparait pas
+- comment trouver la carte numero 7

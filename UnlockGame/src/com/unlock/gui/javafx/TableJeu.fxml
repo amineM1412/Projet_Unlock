@@ -4,29 +4,82 @@
 <?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.layout.Pane?>
 <?import javafx.geometry.Insets?>
 
 <BorderPane xmlns:fx="http://javafx.com/fxml" fx:controller="com.unlock.gui.javafx.TableJeuController">
-    <!-- Barre du haut -->
+    <!-- Barre du haut : titre + oxygene + acte -->
     <top>
-        <HBox spacing="10" alignment="CENTER" style="-fx-background-color: #333333; -fx-padding: 10;">
-            <Label text="Table de Jeu Unlock!" style="-fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold;"/>
-            <Button text="Rafraîchir" onAction="#handleRefresh"/>
-        </HBox>
+        <VBox spacing="0">
+            <HBox spacing="10" alignment="CENTER" style="-fx-background-color: linear-gradient(to right, #0d1117, #161b22, #0d1117); -fx-padding: 10;">
+                <Label text="UNLOCK! - SIGNAL FANTOME"
+                       style="-fx-text-fill: #e0e0e0; -fx-font-size: 16px; -fx-font-weight: bold; -fx-font-family: 'Arial';"/>
+                <Label fx:id="actLabel" text="Acte 1"
+                       style="-fx-text-fill: #64ffda; -fx-font-size: 14px; -fx-font-weight: bold; -fx-background-color: rgba(100,255,218,0.1); -fx-padding: 3 10; -fx-background-radius: 12;"/>
+                <Button text="Rafraichir" onAction="#handleRefresh"
+                        style="-fx-background-color: #21262d; -fx-text-fill: #8b949e; -fx-border-color: #30363d; -fx-border-radius: 6; -fx-background-radius: 6; -fx-cursor: hand;"/>
+            </HBox>
+            <!-- Barre d'oxygene -->
+            <HBox spacing="10" alignment="CENTER" style="-fx-background-color: #0d1117; -fx-padding: 5 15;">
+                <Label text="O2" style="-fx-text-fill: #4fc3f7; -fx-font-size: 13px; -fx-font-weight: bold;"/>
+                <ProgressBar fx:id="oxygenBar" progress="1.0" prefWidth="400" prefHeight="18"
+                             style="-fx-accent: #00e676;"/>
+                <Label fx:id="oxygenLabel" text="100%" style="-fx-text-fill: #00e676; -fx-font-size: 13px; -fx-font-weight: bold;"/>
+            </HBox>
+        </VBox>
     </top>
-    
-    <!-- Zone d'affichage des cartes -->
+
+    <!-- Zone centrale : PLATEAU DE JEU (avec scroll) -->
     <center>
-        <FlowPane fx:id="cardsContainer" hgap="15" vgap="15" style="-fx-background-color: #e0e0e0; -fx-padding: 20;">
-            <!-- Les cartes seront ajoutées ici dynamiquement par le contrôleur -->
-        </FlowPane>
+        <ScrollPane fx:id="boardScrollPane" fitToWidth="true" fitToHeight="true"
+                    style="-fx-background: #0a0a1a; -fx-border-color: transparent; -fx-background-color: #0a0a1a;"
+                    pannable="true">
+            <Pane fx:id="boardContainer"
+                  style="-fx-background-color: #0a0a1a;"/>
+        </ScrollPane>
     </center>
-    
-    <!-- Zone de combinaison de cartes (Drag & Drop visuel en bas) -->
+
+    <!-- Panneau lateral droit : Inventaire + Indices -->
+    <right>
+        <VBox fx:id="sidePanel" spacing="0" prefWidth="230"
+              style="-fx-background-color: linear-gradient(to bottom, #0d1117, #161b22); -fx-border-color: #21262d; -fx-border-width: 0 0 0 2;">
+
+            <!-- Section Inventaire -->
+            <VBox spacing="4" style="-fx-padding: 10;">
+                <Label text="INVENTAIRE"
+                       style="-fx-text-fill: #58a6ff; -fx-font-size: 12px; -fx-font-weight: bold; -fx-font-family: 'Arial';"/>
+                <ScrollPane fitToWidth="true" style="-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: transparent;" prefHeight="150" maxHeight="150">
+                    <VBox fx:id="inventoryContent" spacing="3" style="-fx-padding: 5;">
+                        <Label text="(vide)" style="-fx-text-fill: #484f58; -fx-font-size: 11px;"/>
+                    </VBox>
+                </ScrollPane>
+            </VBox>
+
+            <!-- Separateur -->
+            <Pane style="-fx-background-color: #21262d; -fx-pref-height: 1; -fx-max-height: 1;"/>
+
+            <!-- Section Indices -->
+            <VBox fx:id="indicesPanel" spacing="4" style="-fx-padding: 10;">
+                <Label text="INDICES DECOUVERTS"
+                       style="-fx-text-fill: #ffd54f; -fx-font-size: 12px; -fx-font-weight: bold; -fx-font-family: 'Arial';"/>
+                <ScrollPane fitToWidth="true" style="-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: transparent;" prefHeight="250">
+                    <Label fx:id="indicesContent" text="(aucun indice)"
+                           style="-fx-text-fill: #8b949e; -fx-font-size: 11px;" wrapText="true"/>
+                </ScrollPane>
+            </VBox>
+        </VBox>
+    </right>
+
+    <!-- Zone de combinaison de cartes (Drag and Drop visuel en bas) -->
     <bottom>
-        <HBox fx:id="combinationZone" alignment="CENTER" spacing="20" style="-fx-background-color: #cccccc; -fx-padding: 15; -fx-border-color: #999999; -fx-border-width: 2 0 0 0;">
-            <Label text="➡️ Glissez deux cartes ici pour les combiner ⬅️" style="-fx-font-size: 14px; -fx-text-fill: #555555;"/>
+        <HBox fx:id="combinationZone" alignment="CENTER" spacing="20"
+              style="-fx-background-color: linear-gradient(to right, #0d1117, #161b22, #0d1117); -fx-padding: 12; -fx-border-color: #21262d; -fx-border-width: 2 0 0 0;">
+            <Label text=">> Glissez deux cartes ici pour les combiner &lt;&lt;"
+                   style="-fx-font-size: 14px; -fx-text-fill: #484f58; -fx-font-family: 'Arial';"/>
         </HBox>
     </bottom>
 </BorderPane>

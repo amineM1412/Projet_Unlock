@@ -1,0 +1,12 @@
+Ce que le plan propose
+
+35 cartes réparties en 3 actes (Sas → Labo/Communications → Réacteur/SOS)
+
+3 mini-jeux : Câbles (drag & drop), Fréquences radio (sliders), Tuyaux (rotation de grille)
+Jauge d'oxygène remplaçant le timer (40 min, pénalités variables)
+
+Architecture complètement Serializable avec classes GameState, Inventory
+
+Énigme finale : assembler 3 objets (antenne, batterie, cristal) pour envoyer un SOS
+
+4 codes à trouver : 352, 1987, 2846, et l'énigme finale

@@ -21,7 +21,7 @@ public class Main {
         SwingUtilities.invokeLater(() -> {
             AppCompanion app = new AppCompanion(engine);
             // On la positionne à droite de l'écran pour ne pas cacher la table
-            app.setLocation(850, 100); 
+            app.setLocation(1150, 100); 
             app.setVisible(true);
         });
     }
