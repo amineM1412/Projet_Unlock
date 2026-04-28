@@ -30,6 +30,9 @@ public class GameEngine implements Serializable {
     // Répertoire de sauvegarde
     private String saveDirectory = ".";
 
+    // Pause — transient : pas sérialisé
+    private transient boolean paused = false;
+
     public GameEngine() {
         state = new GameState();
         cablesMiniGame = new CablesMiniGame();
@@ -92,6 +95,7 @@ public class GameEngine implements Serializable {
         // Carte 17 — Lieu
         Card c17 = new Card(17, CardType.NEUTRE, "Salle de communication — Antenne intérieure, console radio, oscilloscope.", 2);
         c17.setHint("La console radio semble fonctionnelle... (voir carte 25)");
+        c17.setRevealsCardIds(new int[]{19, 36}); // Photo equipage + Schema de cablage trouves ici
         deck.put(17, c17);
 
         // Carte 8 — Objet Bleu
@@ -172,8 +176,9 @@ public class GameEngine implements Serializable {
 
         // Carte 35 — Lieu (9B + 26R = 35)
         Card c35 = new Card(35, CardType.NEUTRE, "Salle des miroirs — Miroirs déformants, inscriptions inversées.", 3);
-        c35.setHint("Message dans le miroir : 'Séquence réacteur : 2-8-4-6'");
-        c35.setRevealsCardIds(new int[]{19, 36, 44});
+        // Indice distinct de la carte 44 : le miroir montre l'image inversee de la sequence
+        c35.setHint("Miroir inversé : lisez la séquence à l'envers. '6-4-8-2' reflété... La vraie séquence ?");
+        c35.setRevealsCardIds(new int[]{44}); // Revele le manuel du reacteur (carte 44) qui donne la vraie sequence
         deck.put(35, c35);
 
         // Carte 3 — Objet Bleu
@@ -197,9 +202,10 @@ public class GameEngine implements Serializable {
         Card c20 = new Card(20, CardType.ROUGE, "Module d'alimentation — Batterie de secours pour l'émetteur.", 3);
         deck.put(20, c20);
 
-        // Carte 44 — Indice
-        Card c44 = new Card(44, CardType.NEUTRE, "Manuel du réacteur — Page arrachée : 'Séquence : 2-8-4-6'.", 3);
-        c44.setHint("Séquence d'amorçage du réacteur : 2846");
+        // Carte 44 — Indice (revelé par carte 35)
+        // Distinct de la carte 35 : le manuel confirme la vraie sequence numerique a entrer
+        Card c44 = new Card(44, CardType.NEUTRE, "Manuel du réacteur — Page arrachée : 'Code amorçage = 2846'.", 3);
+        c44.setHint("Code exact pour la console du réacteur (carte 42) : tapez 2846");
         deck.put(44, c44);
 
         // Carte 42 — Code (révélé par mini-jeu tuyaux)
@@ -260,7 +266,19 @@ public class GameEngine implements Serializable {
 
         // Changer d'acte si la carte fouillée introduit un nouvel acte
         if (cardId == 45) state.setCurrentAct(2);
-        if (cardId == 38 || cardId == 15) state.setCurrentAct(3);
+
+        // Acte 3 via carte 38 : seulement si le chemin radio est AUSSI termine
+        // (carte 40 = Kit SOS doit etre visible, sinon on reste en Acte 2)
+        if (cardId == 38) {
+            Card c40 = state.getCard(40);
+            if (c40 != null && c40.isVisible()) {
+                state.setCurrentAct(3);
+            }
+            // Sinon : cartes 15,9,26 revelees mais on reste Acte 2 (pas de positions = pas affichees)
+        }
+
+        // Acte 3 toujours valide via carte 15
+        if (cardId == 15) state.setCurrentAct(3);
 
         return newCards;
     }
@@ -324,13 +342,23 @@ public class GameEngine implements Serializable {
             Card resultCard = state.getCard(resultId);
             if (resultCard != null) {
                 resultCard.setVisible(true);
-                // Auto-retirer la carte CODE apres utilisation reussie
                 machine.setVisible(false);
+
+                // Si le code revele la carte 40 (Kit SOS) = chemin radio termine
+                // Verifier si le chemin cables est aussi fait (carte 15 visible = fouille 38 faite)
+                // Si oui : transition vers Acte 3
+                if (resultId == 40) {
+                    Card c15 = state.getCard(15);
+                    if (c15 != null && c15.isVisible()) {
+                        state.setCurrentAct(3);
+                    }
+                }
+
                 return resultCard;
             }
         }
 
-        // Code incorrect → pénalité de 60 secondes
+        // Code incorrect
         applyPenalty(60);
         return null;
     }
@@ -559,4 +587,10 @@ public class GameEngine implements Serializable {
     public CablesMiniGame getCablesMiniGame() { return cablesMiniGame; }
     public RadioMiniGame getRadioMiniGame() { return radioMiniGame; }
     public PipesMiniGame getPipesMiniGame() { return pipesMiniGame; }
+
+    /** Retourne true si le jeu est en pause (timer arreté). */
+    public boolean isPaused() { return paused; }
+
+    /** Appelé par l'App Compagnon quand Start/Pause est cliqué. */
+    public void setPaused(boolean paused) { this.paused = paused; }
 }

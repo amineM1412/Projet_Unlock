@@ -1,27 +1,14 @@
 package com.unlock.gui.javafx;
 
 import com.unlock.model.Card;
-import javafx.animation.FadeTransition;
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
-import javafx.animation.KeyValue;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
+import javafx.animation.*;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Label;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.Pane;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
-import javafx.scene.paint.CycleMethod;
-import javafx.scene.paint.LinearGradient;
-import javafx.scene.paint.RadialGradient;
-import javafx.scene.paint.Stop;
+import javafx.scene.paint.*;
 import javafx.scene.shape.Circle;
-import javafx.scene.shape.Line;
-import javafx.scene.shape.Polygon;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
@@ -30,59 +17,81 @@ import javafx.util.Duration;
 import java.util.*;
 
 /**
- * Plateau de jeu visuel pour Unlock! - "Signal Fantome"
- * Affiche les cartes dans 3 zones correspondant aux 3 actes
- * de la station spatiale, avec un fond spatial etoile.
+ * Plateau de jeu — affiche UN SEUL acte a la fois.
+ * Les cartes sont invisibles jusqu'a leur decouverte.
+ * Transition animee lors du changement d'acte.
  */
 public class GameBoardPane extends Pane {
 
-    // Dimensions du plateau
-    public static final double BOARD_WIDTH = 1050;
-    public static final double BOARD_HEIGHT = 550;
+    // ================================================================
+    //  CONSTANTES
+    // ================================================================
 
-    // Zones de jeu (positions)
-    private static final double ZONE_WIDTH = 300;
-    private static final double ZONE_HEIGHT = 420;
-    private static final double ZONE_Y = 70;
-    private static final double ZONE1_X = 25;
-    private static final double ZONE2_X = 365;
-    private static final double ZONE3_X = 705;
+    public static final double BOARD_WIDTH  = 940;
+    public static final double BOARD_HEIGHT = 660;
 
-    // Stockage des vues de cartes par ID
-    private Map<Integer, BoardCardView> cardViews = new HashMap<>();
+    private static final double CARD_W   = 100;
+    private static final double CARD_H   = 135;
+    private static final double GAP_X    = 14;
+    private static final double GAP_Y    = 14;
+    private static final double PAD_TOP  = 58;  // espace pour le titre d'acte
+    private static final double PAD_SIDE = 20;
 
-    // Positions precalculees pour chaque carte dans sa zone
-    private Map<Integer, double[]> cardPositions = new HashMap<>();
+    /** IDs des cartes de chaque acte (ordre d'affichage dans la grille) */
+    private static final int[][] ACT_CARD_IDS = {
+        {},                                                                    // index 0 inutilise
+        {10, 12, 13, 6, 24, 30, 45},                                           // Acte 1 — 7 cartes (45 = carte transition, visible apres code 352)
+        {14, 17, 8, 21, 7, 18, 11, 19, 36, 29, 25, 38, 33, 40, 27},           // Acte 2 — 15 cartes (sans 45 qui disparait apres transition)
+        {15, 9, 26, 35, 3, 22, 16, 5, 20, 44, 42, 50, 99}                     // Acte 3 — 13 cartes
+    };
 
-    // Canvas pour le fond spatial
-    private Canvas backgroundCanvas;
+    /** Nombre de colonnes par acte */
+    private static final int[] ACT_COLS = {0, 4, 4, 4};
 
-    // Rectangles de zones
-    private Rectangle zone1Rect, zone2Rect, zone3Rect;
-    private Label zone1Title, zone2Title, zone3Title;
+    /** Titres des actes */
+    private static final String[] ACT_TITLES = {
+        "",
+        "ACTE 1  —  SAS DE DECOMPRESSION",
+        "ACTE 2  —  LABORATOIRE & COMMUNICATIONS",
+        "ACTE 3  —  REACTEUR & ENIGME FINALE"
+    };
 
-    // Etoiles animees
-    private List<Circle> stars = new ArrayList<>();
+    /** Couleurs d'accentuation des actes */
+    private static final String[] ACT_COLORS = {
+        "", "#E53935", "#1E88E5", "#43A047"
+    };
+
+    // ================================================================
+    //  ETAT INTERNE
+    // ================================================================
+
+    /** Vues actives (uniquement les cartes VISIBLES affichees) */
+    private final Map<Integer, BoardCardView> cardViews    = new HashMap<>();
+
+    /** Positions pre-calculees pour le layout de l'acte courant */
+    private final Map<Integer, double[]>      cardPositions = new HashMap<>();
+
+    private int currentAct = 1;
+
+    // Elements visuels
+    private Canvas    backgroundCanvas;
+    private Rectangle actZoneRect;
+    private Label     actTitleLabel;
+    private final List<Circle> stars = new ArrayList<>();
     private Timeline starsTimeline;
 
+    // ================================================================
+    //  CONSTRUCTEUR
+    // ================================================================
+
     public GameBoardPane() {
-        this.setPrefSize(BOARD_WIDTH, BOARD_HEIGHT);
-        this.setMinSize(BOARD_WIDTH, BOARD_HEIGHT);
+        setPrefSize(BOARD_WIDTH, BOARD_HEIGHT);
+        setMinSize(BOARD_WIDTH, BOARD_HEIGHT);
 
-        // Fond spatial
         drawBackground();
-
-        // Etoiles scintillantes
         createStars();
-
-        // 3 zones de jeu
-        createZones();
-
-        // Fleches entre les zones
-        createConnections();
-
-        // Calculer les positions des cartes
-        calculateCardPositions();
+        createActDisplay();
+        loadActPositions(1);  // preparer acte 1 par defaut
     }
 
     // ================================================================
@@ -93,35 +102,23 @@ public class GameBoardPane extends Pane {
         backgroundCanvas = new Canvas(BOARD_WIDTH, BOARD_HEIGHT);
         GraphicsContext gc = backgroundCanvas.getGraphicsContext2D();
 
-        // Gradient de fond : espace profond
         gc.setFill(new LinearGradient(0, 0, 1, 1, true, CycleMethod.NO_CYCLE,
                 new Stop(0, Color.web("#0a0a1a")),
-                new Stop(0.3, Color.web("#0d1b2a")),
-                new Stop(0.6, Color.web("#1b2838")),
+                new Stop(0.5, Color.web("#0d1b2a")),
                 new Stop(1.0, Color.web("#0a0e17"))
         ));
         gc.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
-        // Nebuleuse subtile (halos de couleur)
-        gc.setFill(new RadialGradient(0, 0, 150, 200, 200, false, CycleMethod.NO_CYCLE,
-                new Stop(0, Color.web("#1a237e", 0.15)),
-                new Stop(1, Color.TRANSPARENT)
-        ));
-        gc.fillOval(50, 100, 400, 400);
+        // Nebuleuses subtiles
+        gc.setFill(new RadialGradient(0, 0, 220, 320, 280, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#1a237e", 0.12)), new Stop(1, Color.TRANSPARENT)));
+        gc.fillOval(80, 170, 560, 560);
 
-        gc.setFill(new RadialGradient(0, 0, 750, 150, 200, false, CycleMethod.NO_CYCLE,
-                new Stop(0, Color.web("#4a148c", 0.1)),
-                new Stop(1, Color.TRANSPARENT)
-        ));
-        gc.fillOval(600, 50, 350, 350);
+        gc.setFill(new RadialGradient(0, 0, 720, 180, 220, false, CycleMethod.NO_CYCLE,
+                new Stop(0, Color.web("#4a148c", 0.08)), new Stop(1, Color.TRANSPARENT)));
+        gc.fillOval(620, 80, 440, 440);
 
-        gc.setFill(new RadialGradient(0, 0, 500, 400, 150, false, CycleMethod.NO_CYCLE,
-                new Stop(0, Color.web("#006064", 0.1)),
-                new Stop(1, Color.TRANSPARENT)
-        ));
-        gc.fillOval(400, 300, 300, 300);
-
-        this.getChildren().add(backgroundCanvas);
+        getChildren().add(backgroundCanvas);
     }
 
     // ================================================================
@@ -129,28 +126,27 @@ public class GameBoardPane extends Pane {
     // ================================================================
 
     private void createStars() {
-        Random rand = new Random(42); // seed fixe pour reproductibilite
-        for (int i = 0; i < 80; i++) {
-            double x = rand.nextDouble() * BOARD_WIDTH;
-            double y = rand.nextDouble() * BOARD_HEIGHT;
-            double size = 0.5 + rand.nextDouble() * 1.5;
-
-            Circle star = new Circle(x, y, size);
-            star.setFill(Color.web("#ffffff", 0.3 + rand.nextDouble() * 0.5));
+        Random rand = new Random(42);
+        for (int i = 0; i < 100; i++) {
+            Circle star = new Circle(
+                rand.nextDouble() * BOARD_WIDTH,
+                rand.nextDouble() * BOARD_HEIGHT,
+                0.5 + rand.nextDouble() * 1.5
+            );
+            star.setFill(Color.web("#ffffff", 0.25 + rand.nextDouble() * 0.55));
             stars.add(star);
-            this.getChildren().add(star);
+            getChildren().add(star);
         }
 
-        // Animation de scintillement
         starsTimeline = new Timeline();
-        for (int i = 0; i < stars.size(); i++) {
-            Circle star = stars.get(i);
-            double delay = new Random().nextDouble() * 4000;
+        Random r2 = new Random();
+        for (Circle star : stars) {
+            double delay = r2.nextDouble() * 4000;
             starsTimeline.getKeyFrames().addAll(
                 new KeyFrame(Duration.millis(delay),
                     new KeyValue(star.opacityProperty(), star.getOpacity())),
                 new KeyFrame(Duration.millis(delay + 1500),
-                    new KeyValue(star.opacityProperty(), 0.1)),
+                    new KeyValue(star.opacityProperty(), 0.08)),
                 new KeyFrame(Duration.millis(delay + 3000),
                     new KeyValue(star.opacityProperty(), star.getOpacity()))
             );
@@ -160,146 +156,130 @@ public class GameBoardPane extends Pane {
     }
 
     // ================================================================
-    //  ZONES DE JEU
+    //  ZONE D'ACTE
     // ================================================================
 
-    private void createZones() {
-        // Zone 1 - Sas de Decompression
-        zone1Rect = createZoneRectangle(ZONE1_X, ZONE_Y, ZONE_WIDTH, ZONE_HEIGHT,
-                "#E53935", "Acte 1");
-        zone1Title = createZoneTitle("SAS DE DECOMPRESSION", ZONE1_X, ZONE_Y - 5, ZONE_WIDTH,
-                "#E53935");
-
-        // Zone 2 - Laboratoire & Communications
-        zone2Rect = createZoneRectangle(ZONE2_X, ZONE_Y, ZONE_WIDTH, ZONE_HEIGHT,
-                "#1E88E5", "Acte 2");
-        zone2Title = createZoneTitle("LABORATOIRE & COMMS", ZONE2_X, ZONE_Y - 5, ZONE_WIDTH,
-                "#1E88E5");
-
-        // Zone 3 - Reacteur & Finale
-        zone3Rect = createZoneRectangle(ZONE3_X, ZONE_Y, ZONE_WIDTH, ZONE_HEIGHT,
-                "#43A047", "Acte 3");
-        zone3Title = createZoneTitle("REACTEUR & FINALE", ZONE3_X, ZONE_Y - 5, ZONE_WIDTH,
-                "#43A047");
-    }
-
-    private Rectangle createZoneRectangle(double x, double y, double w, double h,
-                                           String colorHex, String actLabel) {
-        Rectangle rect = new Rectangle(x, y, w, h);
-        rect.setArcWidth(16);
-        rect.setArcHeight(16);
-        rect.setFill(Color.web(colorHex, 0.08));
-        rect.setStroke(Color.web(colorHex, 0.35));
-        rect.setStrokeWidth(2);
+    private void createActDisplay() {
+        // Cadre de zone
+        actZoneRect = new Rectangle(PAD_SIDE, 44, BOARD_WIDTH - PAD_SIDE * 2, BOARD_HEIGHT - 54);
+        actZoneRect.setArcWidth(18);
+        actZoneRect.setArcHeight(18);
+        actZoneRect.setFill(Color.web(ACT_COLORS[1], 0.07));
+        actZoneRect.setStroke(Color.web(ACT_COLORS[1], 0.30));
+        actZoneRect.setStrokeWidth(2);
 
         DropShadow ds = new DropShadow();
-        ds.setRadius(15);
-        ds.setColor(Color.web(colorHex, 0.2));
-        rect.setEffect(ds);
+        ds.setRadius(18);
+        ds.setColor(Color.web(ACT_COLORS[1], 0.20));
+        actZoneRect.setEffect(ds);
+        getChildren().add(actZoneRect);
 
-        this.getChildren().add(rect);
-
-        // Label de l'acte (en haut a droite de la zone)
-        Label actLbl = new Label(actLabel);
-        actLbl.setFont(Font.font("Arial", FontWeight.BOLD, 10));
-        actLbl.setTextFill(Color.web(colorHex, 0.6));
-        actLbl.setLayoutX(x + w - 50);
-        actLbl.setLayoutY(y + 5);
-        this.getChildren().add(actLbl);
-
-        return rect;
-    }
-
-    private Label createZoneTitle(String title, double x, double y, double width,
-                                   String colorHex) {
-        Label lbl = new Label(title);
-        lbl.setFont(Font.font("Arial", FontWeight.BOLD, 11));
-        lbl.setTextFill(Color.web(colorHex, 0.8));
-        lbl.setLayoutX(x + 10);
-        lbl.setLayoutY(y + 8);
-        lbl.setPrefWidth(width - 60);
-        this.getChildren().add(lbl);
-        return lbl;
+        // Titre d'acte
+        actTitleLabel = new Label(ACT_TITLES[1]);
+        actTitleLabel.setFont(Font.font("Arial", FontWeight.BOLD, 15));
+        actTitleLabel.setTextFill(Color.web(ACT_COLORS[1]));
+        actTitleLabel.setLayoutX(PAD_SIDE + 12);
+        actTitleLabel.setLayoutY(14);
+        getChildren().add(actTitleLabel);
     }
 
     // ================================================================
-    //  CONNEXIONS VISUELLES (fleches entre zones)
-    // ================================================================
-
-    private void createConnections() {
-        // Fleche Zone1 -> Zone2
-        createArrow(ZONE1_X + ZONE_WIDTH + 5, ZONE_Y + ZONE_HEIGHT / 2,
-                    ZONE2_X - 5, ZONE_Y + ZONE_HEIGHT / 2, "#4fc3f7");
-
-        // Fleche Zone2 -> Zone3
-        createArrow(ZONE2_X + ZONE_WIDTH + 5, ZONE_Y + ZONE_HEIGHT / 2,
-                    ZONE3_X - 5, ZONE_Y + ZONE_HEIGHT / 2, "#4fc3f7");
-    }
-
-    private void createArrow(double x1, double y1, double x2, double y2, String colorHex) {
-        // Ligne principale (pointillee)
-        Line line = new Line(x1, y1, x2, y2);
-        line.setStroke(Color.web(colorHex, 0.5));
-        line.setStrokeWidth(2);
-        line.getStrokeDashArray().addAll(8.0, 4.0);
-
-        // Pointe de fleche
-        double angle = Math.atan2(y2 - y1, x2 - x1);
-        double arrowSize = 10;
-        Polygon arrowHead = new Polygon();
-        arrowHead.getPoints().addAll(
-            x2, y2,
-            x2 - arrowSize * Math.cos(angle - Math.PI / 6),
-            y2 - arrowSize * Math.sin(angle - Math.PI / 6),
-            x2 - arrowSize * Math.cos(angle + Math.PI / 6),
-            y2 - arrowSize * Math.sin(angle + Math.PI / 6)
-        );
-        arrowHead.setFill(Color.web(colorHex, 0.5));
-
-        this.getChildren().addAll(line, arrowHead);
-    }
-
-    // ================================================================
-    //  POSITIONS DES CARTES
+    //  CHARGEMENT DES POSITIONS PAR ACTE
     // ================================================================
 
     /**
-     * Precalcule les positions de chaque carte dans sa zone.
-     * Disposition en grille 3 colonnes x N lignes dans chaque zone.
+     * Pre-calcule les positions de grille de toutes les cartes de l'acte.
+     * (Les cartes non encore visibles auront quand meme une position reservee.)
      */
-    private void calculateCardPositions() {
-        // Padding a l'interieur des zones
-        double padX = 12;
-        double padY = 30;
-        double cardW = 95;
-        double cardH = 130;
-        double gapX = 4;
-        double gapY = 8;
+    public void loadActPositions(int actNumber) {
+        cardPositions.clear();
+        currentAct = actNumber;
+        if (actNumber < 1 || actNumber > 3) return;
 
-        // ACTE 1 : Cartes 10, 12, 13, 6, 24, 30
-        int[] act1Cards = {10, 12, 13, 6, 24, 30};
-        layoutCardsInZone(act1Cards, ZONE1_X, ZONE_Y, padX, padY, cardW, cardH, gapX, gapY, 3);
+        int[] ids  = ACT_CARD_IDS[actNumber];
+        int   cols = ACT_COLS[actNumber];
 
-        // ACTE 2 : Cartes 45, 14, 17, 8, 21, 7, 18, 11, 29, 25, 38, 33, 40, 27
-        int[] act2Cards = {45, 14, 17, 8, 21, 7, 18, 11, 29, 25, 38, 33, 40, 27};
-        layoutCardsInZone(act2Cards, ZONE2_X, ZONE_Y, padX, padY, cardW, cardH, gapX, gapY, 3);
+        // Centrage horizontal
+        double totalW = cols * CARD_W + (cols - 1) * GAP_X;
+        double startX = (BOARD_WIDTH - totalW) / 2.0;
 
-        // ACTE 3 : Cartes 15, 9, 26, 35, 3, 22, 16, 5, 20, 19, 36, 44, 42, 50, 99
-        int[] act3Cards = {15, 9, 26, 35, 3, 22, 16, 5, 20, 19, 36, 44, 42, 50, 99};
-        layoutCardsInZone(act3Cards, ZONE3_X, ZONE_Y, padX, padY, cardW, cardH, gapX, gapY, 3);
-    }
+        // Calcul du nombre de lignes pour verifier que ca rentre
+        int rows = (int) Math.ceil((double) ids.length / cols);
+        // Hauteur totale des cartes
+        double totalH = rows * CARD_H + (rows - 1) * GAP_Y;
+        // Zone disponible
+        double availH = BOARD_HEIGHT - PAD_TOP - PAD_SIDE;
+        // Si ca deborde, reduire l'ecart vertical
+        double actualGapY = GAP_Y;
+        if (totalH > availH) {
+            actualGapY = Math.max(4, (availH - rows * CARD_H) / Math.max(1, rows - 1));
+        }
 
-    private void layoutCardsInZone(int[] cardIds, double zoneX, double zoneY,
-                                    double padX, double padY,
-                                    double cardW, double cardH,
-                                    double gapX, double gapY, int cols) {
-        for (int i = 0; i < cardIds.length; i++) {
+        for (int i = 0; i < ids.length; i++) {
             int col = i % cols;
             int row = i / cols;
-            double x = zoneX + padX + col * (cardW + gapX);
-            double y = zoneY + padY + row * (cardH + gapY);
-            cardPositions.put(cardIds[i], new double[]{x, y});
+            double x = startX + col * (CARD_W + GAP_X);
+            double y = PAD_TOP + row * (CARD_H + actualGapY);
+            cardPositions.put(ids[i], new double[]{x, y});
         }
+    }
+
+    // ================================================================
+    //  TRANSITION ENTRE ACTES
+    // ================================================================
+
+    /**
+     * Effectue une transition animee vers le nouvel acte.
+     * Retire les cartes actuelles avec un fondu, met a jour le titre,
+     * puis appelle onComplete (qui ajoutera les nouvelles cartes visibles).
+     */
+    public void transitionToAct(int newAct, Runnable onComplete) {
+        List<BoardCardView> toRemove = new ArrayList<>(cardViews.values());
+
+        if (toRemove.isEmpty()) {
+            applyActTransition(newAct, onComplete);
+            return;
+        }
+
+        int[] doneCount = {0};
+        for (BoardCardView view : toRemove) {
+            view.stopAnimations();
+            FadeTransition ft = new FadeTransition(Duration.millis(300), view);
+            ft.setFromValue(1.0);
+            ft.setToValue(0.0);
+            ft.setOnFinished(ev -> {
+                getChildren().remove(view);
+                doneCount[0]++;
+                if (doneCount[0] == toRemove.size()) {
+                    cardViews.clear();
+                    applyActTransition(newAct, onComplete);
+                }
+            });
+            ft.play();
+        }
+    }
+
+    private void applyActTransition(int newAct, Runnable onComplete) {
+        loadActPositions(newAct);
+
+        // Mise a jour visuelle du cadre et du titre
+        String color = ACT_COLORS[newAct];
+        actTitleLabel.setText(ACT_TITLES[newAct]);
+        actTitleLabel.setTextFill(Color.web(color));
+        actZoneRect.setFill(Color.web(color, 0.07));
+        actZoneRect.setStroke(Color.web(color, 0.30));
+        DropShadow ds = new DropShadow();
+        ds.setRadius(18);
+        ds.setColor(Color.web(color, 0.20));
+        actZoneRect.setEffect(ds);
+
+        // Animer le titre (pulse)
+        ScaleTransition pulse = new ScaleTransition(Duration.millis(400), actTitleLabel);
+        pulse.setFromX(0.8); pulse.setToX(1.0);
+        pulse.setFromY(0.8); pulse.setToY(1.0);
+        pulse.play();
+
+        if (onComplete != null) onComplete.run();
     }
 
     // ================================================================
@@ -307,70 +287,65 @@ public class GameBoardPane extends Pane {
     // ================================================================
 
     /**
-     * Ajoute ou met a jour une carte sur le plateau.
-     * Si la carte n'etait pas visible avant et qu'elle l'est maintenant,
-     * joue l'animation de retournement.
+     * Ajoute une carte visible sur le plateau (sans animation).
+     * Si la carte n'est PAS visible, elle n'est PAS affichee.
      */
     public BoardCardView addOrUpdateCard(Card card) {
         BoardCardView existing = cardViews.get(card.getId());
 
         if (existing != null) {
-            // Carte deja sur le plateau
             if (card.isVisible() && !existing.isFaceUp()) {
                 existing.flipToFront();
             } else if (!card.isVisible()) {
-                // Carte retiree — on enleve la vue
-                this.getChildren().remove(existing);
-                cardViews.remove(card.getId());
+                removeCard(card.getId());
                 return null;
             }
             return existing;
         }
 
-        // Nouvelle carte a ajouter
+        // Ne pas afficher les cartes non decouvertes
+        if (!card.isVisible()) return null;
+
         double[] pos = cardPositions.get(card.getId());
-        if (pos == null) return null; // carte inconnue dans le layout
+        if (pos == null) return null;  // carte pas dans cet acte
 
         BoardCardView view = new BoardCardView(card);
         view.setLayoutX(pos[0]);
         view.setLayoutY(pos[1]);
-
         cardViews.put(card.getId(), view);
-        this.getChildren().add(view);
-
-        // Si visible, animer le retournement (sauf au 1er chargement)
-        if (card.isVisible()) {
-            view.showFrontImmediately();
-        }
+        getChildren().add(view);
+        view.showFrontImmediately();
 
         return view;
     }
 
     /**
-     * Ajoute une nouvelle carte avec animation de retournement
+     * Ajoute une carte avec animation de retournement (decouverte en cours de partie).
      */
     public BoardCardView addCardWithFlip(Card card) {
+        if (!card.isVisible()) return null;
+
         double[] pos = cardPositions.get(card.getId());
         if (pos == null) return null;
 
-        // Supprimer l'ancienne vue si elle existe
+        // Supprimer l'ancienne vue si necessaire
         BoardCardView existing = cardViews.get(card.getId());
         if (existing != null) {
-            this.getChildren().remove(existing);
+            existing.stopAnimations();
+            getChildren().remove(existing);
         }
 
         BoardCardView view = new BoardCardView(card);
         view.setLayoutX(pos[0]);
         view.setLayoutY(pos[1]);
-
-        cardViews.put(card.getId(), view);
-        this.getChildren().add(view);
-
-        // Animation : apparition + flip
         view.setOpacity(0);
         view.showBackImmediately();
 
-        FadeTransition fadeIn = new FadeTransition(Duration.millis(300), view);
+        cardViews.put(card.getId(), view);
+        getChildren().add(view);
+
+        // Fondu + retournement
+        FadeTransition fadeIn = new FadeTransition(Duration.millis(250), view);
         fadeIn.setFromValue(0);
         fadeIn.setToValue(1);
         fadeIn.setOnFinished(e -> view.flipToFront());
@@ -380,76 +355,64 @@ public class GameBoardPane extends Pane {
     }
 
     /**
-     * Retourne la vue d'une carte par son ID
-     */
-    public BoardCardView getCardView(int cardId) {
-        return cardViews.get(cardId);
-    }
-
-    /**
-     * Retire une carte du plateau
+     * Retire une carte du plateau avec fondu.
      */
     public void removeCard(int cardId) {
         BoardCardView view = cardViews.remove(cardId);
         if (view != null) {
             view.stopAnimations();
-
-            FadeTransition fadeOut = new FadeTransition(Duration.millis(400), view);
-            fadeOut.setFromValue(1);
-            fadeOut.setToValue(0);
-            fadeOut.setOnFinished(e -> this.getChildren().remove(view));
-            fadeOut.play();
+            FadeTransition ft = new FadeTransition(Duration.millis(350), view);
+            ft.setFromValue(1.0);
+            ft.setToValue(0.0);
+            ft.setOnFinished(e -> getChildren().remove(view));
+            ft.play();
         }
     }
 
-    /**
-     * Vide toutes les cartes du plateau (pas le fond)
-     */
-    public void clearCards() {
-        for (BoardCardView view : cardViews.values()) {
-            view.stopAnimations();
-            this.getChildren().remove(view);
-        }
-        cardViews.clear();
+    /** Retourne la vue d'une carte par son ID. */
+    public BoardCardView getCardView(int cardId) {
+        return cardViews.get(cardId);
     }
 
-    /**
-     * Retourne toutes les vues de cartes
-     */
+    /** Retourne toutes les vues actives. */
     public Collection<BoardCardView> getAllCardViews() {
         return cardViews.values();
     }
 
-    /**
-     * Met en surbrillance une zone (quand l'acte change)
-     */
-    public void highlightZone(int actNumber) {
-        // Reset all
-        zone1Rect.setStrokeWidth(2);
-        zone2Rect.setStrokeWidth(2);
-        zone3Rect.setStrokeWidth(2);
-        zone1Rect.setOpacity(1.0);
-        zone2Rect.setOpacity(1.0);
-        zone3Rect.setOpacity(1.0);
-
-        // Highlight active zone
-        Rectangle activeZone;
-        switch (actNumber) {
-            case 1: activeZone = zone1Rect; break;
-            case 2: activeZone = zone2Rect; break;
-            case 3: activeZone = zone3Rect; break;
-            default: return;
+    /** Vide toutes les cartes (sans animation). */
+    public void clearCards() {
+        for (BoardCardView v : cardViews.values()) {
+            v.stopAnimations();
+            getChildren().remove(v);
         }
-        activeZone.setStrokeWidth(3);
+        cardViews.clear();
+    }
+
+    /** Arrete toutes les animations. */
+    public void stopAllAnimations() {
+        if (starsTimeline != null) starsTimeline.stop();
+        for (BoardCardView v : cardViews.values()) v.stopAnimations();
+    }
+
+    // ================================================================
+    //  METHODE LEGACY (gardee pour compatibilite)
+    // ================================================================
+
+    /** @deprecated Remplace par transitionToAct(). */
+    public void highlightZone(int actNumber) {
+        // No-op : une seule zone affichee a la fois
+    }
+
+    public int getCurrentAct() {
+        return currentAct;
     }
 
     /**
-     * Arrete toutes les animations
+     * Retourne true si la carte a une position pre-calculee dans l'acte courant.
+     * Permet de filtrer correctement les cartes sans se fier uniquement a actNumber
+     * (ex: carte 45 qui a actNumber=2 mais apparait dans le layout de l'acte 1).
      */
-    public void stopAllAnimations() {
-        if (starsTimeline != null) starsTimeline.stop();
-        for (BoardCardView view : cardViews.values()) {
-            view.stopAnimations();
-        }
+    public boolean hasPositionForCard(int cardId) {
+        return cardPositions.containsKey(cardId);
     }
 }

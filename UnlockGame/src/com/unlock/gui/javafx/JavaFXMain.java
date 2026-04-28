@@ -28,7 +28,7 @@ public class JavaFXMain extends Application {
         controller.setGameEngine(engine);
 
         primaryStage.setTitle("Unlock! - Station Heliox-7");
-        primaryStage.setScene(new Scene(root, 1100, 700));
+        primaryStage.setScene(new Scene(root, 1180, 710));
         primaryStage.show();
     }
 

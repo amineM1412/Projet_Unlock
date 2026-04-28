@@ -36,8 +36,8 @@ public class BoardCardView extends StackPane {
 
     public static final EventType<Event> CARD_SELECTED = new EventType<>(Event.ANY, "BOARD_CARD_SELECTED");
 
-    private static final double CARD_WIDTH = 95;
-    private static final double CARD_HEIGHT = 130;
+    private static final double CARD_WIDTH = 100;
+    private static final double CARD_HEIGHT = 135;
 
     private final Card card;
     private final VBox frontFace;

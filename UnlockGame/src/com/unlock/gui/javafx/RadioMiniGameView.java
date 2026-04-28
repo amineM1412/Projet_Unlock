@@ -43,7 +43,9 @@ public class RadioMiniGameView {
         stage = new Stage();
         stage.initModality(Modality.APPLICATION_MODAL);
         stage.setTitle("Mini-jeu : Transmission Radio");
-        stage.setResizable(false);
+        stage.setResizable(true);   // redimensionnable si besoin
+        stage.setMinWidth(580);
+        stage.setMinHeight(580);
 
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: #0a0a1a;");
@@ -94,28 +96,29 @@ public class RadioMiniGameView {
 
         slidersBox.getChildren().addAll(dial1Box, dial2Box, dial3Box);
 
-        // ===== BOUTONS =====
-        HBox bottomBox = new HBox(15);
-        bottomBox.setAlignment(Pos.CENTER);
-        bottomBox.setPadding(new Insets(10, 0, 0, 0));
-
+        // ===== BOUTON VALIDER =====
         statusLabel = new Label("");
         statusLabel.setStyle("-fx-text-fill: #aaaaaa; -fx-font-size: 13px;");
+        statusLabel.setWrapText(true);
+        statusLabel.setMaxWidth(350);
 
-        Button validateBtn = new Button("Emettre");
-        validateBtn.setStyle("-fx-background-color: #00897B; -fx-text-fill: white; -fx-font-size: 14px; " +
-                             "-fx-font-weight: bold; -fx-padding: 8 20; -fx-background-radius: 5;");
+        Button validateBtn = new Button(" Emettre le signal ");
+        validateBtn.setStyle("-fx-background-color: #00897B; -fx-text-fill: white; -fx-font-size: 15px; "
+                + "-fx-font-weight: bold; -fx-padding: 10 30; -fx-background-radius: 8;"
+                + "-fx-cursor: hand;");
         validateBtn.setOnAction(e -> handleValidation());
+        validateBtn.setMaxWidth(Double.MAX_VALUE);
 
-        bottomBox.getChildren().addAll(statusLabel, validateBtn);
-
-        VBox bottomVBox = new VBox(10, slidersBox, bottomBox);
+        // Regrouper sliders + statut + bouton dans la zone du bas
+        VBox bottomVBox = new VBox(12, slidersBox, statusLabel, validateBtn);
+        bottomVBox.setAlignment(Pos.CENTER);
+        bottomVBox.setPadding(new Insets(10, 10, 15, 10));
         root.setBottom(bottomVBox);
 
         // ===== ANIMATION DE L'OSCILLOSCOPE =====
         startWaveAnimation();
 
-        Scene scene = new Scene(root, 550, 500);
+        Scene scene = new Scene(root, 600, 620);
         stage.setScene(scene);
         stage.setOnCloseRequest(e -> stopWaveAnimation());
         stage.show();

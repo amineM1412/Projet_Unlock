@@ -16,17 +16,15 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 
 import java.util.*;
 
 /**
  * Controleur JavaFX pour la table de jeu Unlock!
- * Gere l'affichage du plateau visuel, la fouille, la combinaison,
- * les mini-jeux, les indices et la jauge d'oxygene.
+ * - Un seul acte visible a la fois
+ * - Cartes invisibles jusqu'a leur decouverte
+ * - La pause bloque toute interaction (anti-triche)
  */
 public class TableJeuController {
 
@@ -44,17 +42,20 @@ public class TableJeuController {
     private GameEngine engine;
     private GameBoardPane gameBoard;
 
-    // Carte en attente de combinaison
+    // Carte en attente de combinaison (drag & drop)
     private Card cardToCombine1 = null;
 
-    // Liste des indices decouverts (stockes sous forme de phrase)
-    private List<String> discoveredHints = new ArrayList<>();
+    // Suivi de l'etat
+    private List<String>   discoveredHints    = new ArrayList<>();
+    private Set<Integer>   knownVisibleCards  = new HashSet<>();
+    private int            knownAct           = 1;
 
-    // Set des cartes deja connues comme visibles (pour detecter les nouvelles)
-    private Set<Integer> knownVisibleCards = new HashSet<>();
-
-    // Timeline pour rafraichir periodiquement (detecter changements depuis AppCompanion)
+    // Timer de rafraichissement periodique (pour sync AppCompanion)
     private Timeline refreshTimeline;
+
+    // ================================================================
+    //  INITIALISATION
+    // ================================================================
 
     public void setGameEngine(GameEngine engine) {
         this.engine = engine;
@@ -70,130 +71,121 @@ public class TableJeuController {
     }
 
     /**
-     * Initialise le plateau de jeu visuel
+     * Initialise le plateau : seules les cartes DEJA VISIBLES sont affichees.
+     * (Au depart, seulement la carte 10.)
      */
     private void initBoard() {
         gameBoard = new GameBoardPane();
         boardContainer.getChildren().add(gameBoard);
-
-        // Dimensionner le conteneur
         boardContainer.setPrefSize(GameBoardPane.BOARD_WIDTH, GameBoardPane.BOARD_HEIGHT);
         boardContainer.setMinSize(GameBoardPane.BOARD_WIDTH, GameBoardPane.BOARD_HEIGHT);
 
-        // Placer toutes les cartes du deck sur le plateau (face cachee)
         for (Card card : engine.getDeck().values()) {
-            BoardCardView view = gameBoard.addOrUpdateCard(card);
-            if (view != null) {
-                enableDragDropOnCard(view);
-                view.addEventHandler(BoardCardView.CARD_SELECTED, e -> {
-                    handleCardInteraction(view.getCard());
-                });
-                // Marquer comme connue si deja visible
-                if (card.isVisible()) {
+            if (card.isVisible() && card.getActNumber() == knownAct) {
+                BoardCardView view = gameBoard.addOrUpdateCard(card);
+                if (view != null) {
+                    attachHandlers(view);
                     knownVisibleCards.add(card.getId());
                 }
             }
         }
-
-        // Highlight la zone de l'acte initial
-        gameBoard.highlightZone(engine.getCurrentAct());
     }
+
+    // ================================================================
+    //  RAFRAICHISSEMENT
+    // ================================================================
 
     @FXML
     public void handleRefresh() {
-        // Reset de la zone de combinaison
         cardToCombine1 = null;
         comboInstructionLabel.setText(">> Glissez deux cartes ici pour les combiner <<");
         comboInstructionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #484f58;");
         refreshTable();
     }
 
-    /**
-     * Demarre un rafraichissement periodique toutes les 2 secondes
-     * pour detecter les changements effectues depuis l'AppCompanion (codes entres).
-     */
     private void startPeriodicRefresh() {
         refreshTimeline = new Timeline(new KeyFrame(Duration.seconds(2), e -> {
-            if (engine != null) {
-                refreshTable();
-            }
+            if (engine != null) refreshTable();
         }));
         refreshTimeline.setCycleCount(Timeline.INDEFINITE);
         refreshTimeline.play();
     }
 
-    // ================================================================
-    //  RAFRAICHISSEMENT DE L'AFFICHAGE
-    // ================================================================
-
     /**
-     * Rafraichit l'affichage complet : cartes, oxygene, indices, acte, inventaire.
+     * Rafraichit l'affichage complet.
+     * Detecte les nouvelles cartes visibles et les changements d'acte.
      */
     public void refreshTable() {
         if (engine == null || gameBoard == null) return;
 
-        // Verifier etat du jeu
-        if (engine.isGameWon()) {
-            showVictory();
-            return;
-        }
-        if (engine.isGameLost()) {
-            showGameOver();
-            return;
-        }
+        if (engine.isGameWon())  { showVictory();  return; }
+        if (engine.isGameLost()) { showGameOver(); return; }
 
-        // Mettre a jour les cartes sur le plateau
-        for (Card card : engine.getDeck().values()) {
-            if (card.isVisible() && !knownVisibleCards.contains(card.getId())) {
-                // Nouvelle carte visible ! Animer le retournement
-                BoardCardView view = gameBoard.getCardView(card.getId());
-                if (view != null) {
-                    view.flipToFront();
-                } else {
-                    // Carte pas encore sur le plateau, l'ajouter avec animation
-                    view = gameBoard.addCardWithFlip(card);
+        int currentAct = engine.getCurrentAct();
+
+        // --- Changement d'acte ---
+        if (currentAct != knownAct) {
+            knownAct = currentAct;
+            // Vider le suivi completement : addVisibleCardsOfCurrentAct le reconstruira
+            knownVisibleCards.clear();
+            // Transition animee vers le nouvel acte
+            gameBoard.transitionToAct(currentAct, this::addVisibleCardsOfCurrentAct);
+        } else {
+            // Detecter les nouvelles cartes visibles dans le layout de l'acte courant
+            for (Card card : engine.getDeck().values()) {
+                // Ignorer les cartes qui n'ont pas de position dans l'acte affiche
+                if (!gameBoard.hasPositionForCard(card.getId())) continue;
+
+                if (card.isVisible() && !knownVisibleCards.contains(card.getId())) {
+                    // Nouvelle carte decouverte !
+                    BoardCardView view = gameBoard.getCardView(card.getId());
                     if (view != null) {
-                        enableDragDropOnCard(view);
-                        final BoardCardView finalView = view;
-                        view.addEventHandler(BoardCardView.CARD_SELECTED, e -> {
-                            handleCardInteraction(finalView.getCard());
-                        });
+                        view.flipToFront();
+                    } else {
+                        view = gameBoard.addCardWithFlip(card);
+                        if (view != null) attachHandlers(view);
                     }
+                    knownVisibleCards.add(card.getId());
+
+                } else if (!card.isVisible() && knownVisibleCards.contains(card.getId())) {
+                    // Carte retiree
+                    gameBoard.removeCard(card.getId());
+                    knownVisibleCards.remove(card.getId());
                 }
-                knownVisibleCards.add(card.getId());
-            } else if (!card.isVisible() && knownVisibleCards.contains(card.getId())) {
-                // Carte retiree (fouillee ou combinee)
-                gameBoard.removeCard(card.getId());
-                knownVisibleCards.remove(card.getId());
             }
         }
 
-        // Rafraichir l'oxygene
         updateOxygenDisplay();
-
-        // Rafraichir l'acte
-        if (actLabel != null) {
-            actLabel.setText("Acte " + engine.getCurrentAct());
-            gameBoard.highlightZone(engine.getCurrentAct());
-        }
-
-        // Rafraichir les indices
+        if (actLabel != null) actLabel.setText("Acte " + currentAct);
         updateIndicesDisplay();
-
-        // Rafraichir l'inventaire
         updateInventoryDisplay();
     }
 
     /**
-     * Met a jour l'affichage de la jauge d'oxygene
+     * Apres une transition d'acte, ajoute toutes les cartes visibles
+     * qui ont une position dans le nouveau layout.
      */
+    private void addVisibleCardsOfCurrentAct() {
+        for (Card card : engine.getDeck().values()) {
+            // Seulement les cartes avec une position dans l'acte courant
+            if (card.isVisible() && gameBoard.hasPositionForCard(card.getId())
+                    && !knownVisibleCards.contains(card.getId())) {
+                BoardCardView view = gameBoard.addCardWithFlip(card);
+                if (view != null) attachHandlers(view);
+                knownVisibleCards.add(card.getId());
+            }
+        }
+    }
+
+    // ================================================================
+    //  AFFICHAGE
+    // ================================================================
+
     private void updateOxygenDisplay() {
         if (oxygenBar == null || oxygenLabel == null) return;
-
         double pct = engine.getOxygenPercentage() / 100.0;
         oxygenBar.setProgress(pct);
         oxygenLabel.setText(engine.getOxygenPercentage() + "%");
-
         if (pct > 0.5) {
             oxygenLabel.setStyle("-fx-text-fill: #00e676; -fx-font-size: 13px; -fx-font-weight: bold;");
             oxygenBar.setStyle("-fx-accent: #00e676;");
@@ -206,98 +198,85 @@ public class TableJeuController {
         }
     }
 
-    /**
-     * Met a jour l'affichage des indices decouverts
-     */
     private void updateIndicesDisplay() {
         if (indicesContent == null) return;
-
         if (discoveredHints.isEmpty()) {
             indicesContent.setText("(aucun indice)");
         } else {
             StringBuilder sb = new StringBuilder();
-            for (String hint : discoveredHints) {
-                sb.append(hint).append("\n\n");
-            }
+            for (String h : discoveredHints) sb.append(h).append("\n\n");
             indicesContent.setText(sb.toString().trim());
         }
     }
 
-    /**
-     * Met a jour l'affichage de l'inventaire
-     */
     private void updateInventoryDisplay() {
         if (inventoryContent == null) return;
         inventoryContent.getChildren().clear();
-
         List<Card> items = engine.getInventory().getItems();
         if (items.isEmpty()) {
-            Label emptyLabel = new Label("(vide)");
-            emptyLabel.setStyle("-fx-text-fill: #484f58; -fx-font-size: 11px;");
-            inventoryContent.getChildren().add(emptyLabel);
+            Label e = new Label("(vide)");
+            e.setStyle("-fx-text-fill: #484f58; -fx-font-size: 11px;");
+            inventoryContent.getChildren().add(e);
         } else {
             for (Card item : items) {
-                String colorHex;
-                switch (item.getType()) {
-                    case BLEU: colorHex = "#58a6ff"; break;
-                    case ROUGE: colorHex = "#f85149"; break;
-                    default: colorHex = "#8b949e"; break;
-                }
+                String hex = item.getType() == CardType.BLEU ? "#58a6ff"
+                           : item.getType() == CardType.ROUGE ? "#f85149" : "#8b949e";
                 String name = item.getDescription();
-                if (name.contains("\u2014")) {
-                    name = name.substring(0, name.indexOf("\u2014")).trim();
-                }
-                Label itemLabel = new Label("[" + item.getId() + "] " + name);
-                itemLabel.setStyle("-fx-text-fill: " + colorHex + "; -fx-font-size: 10px; " +
-                        "-fx-background-color: rgba(255,255,255,0.05); -fx-padding: 3 6; " +
-                        "-fx-background-radius: 4;");
-                itemLabel.setWrapText(true);
-                itemLabel.setMaxWidth(200);
-                inventoryContent.getChildren().add(itemLabel);
+                if (name.contains("\u2014")) name = name.substring(0, name.indexOf("\u2014")).trim();
+                Label lbl = new Label("[" + item.getId() + "] " + name);
+                lbl.setStyle("-fx-text-fill:" + hex + "; -fx-font-size:10px;"
+                        + "-fx-background-color:rgba(255,255,255,0.05);"
+                        + "-fx-padding:3 6; -fx-background-radius:4;");
+                lbl.setWrapText(true);
+                lbl.setMaxWidth(200);
+                inventoryContent.getChildren().add(lbl);
             }
         }
     }
 
-    /**
-     * Ajoute un indice a la liste des indices decouverts
-     */
     private void addDiscoveredHint(Card card) {
-        String hintText = "Carte " + card.getId() + " : " + card.getHint();
-        // Eviter les doublons
-        if (!discoveredHints.contains(hintText)) {
-            discoveredHints.add(hintText);
-        }
+        String txt = "Carte " + card.getId() + " : " + card.getHint();
+        if (!discoveredHints.contains(txt)) discoveredHints.add(txt);
     }
 
     // ================================================================
-    //  INTERACTION AVEC LES CARTES (Double-clic)
+    //  INTERACTIONS CARTES
     // ================================================================
 
     /**
-     * Gere l'interaction double-clic sur une carte selon son type.
+     * Attache les handlers de double-clic et drag-drop a une vue de carte.
+     */
+    private void attachHandlers(BoardCardView view) {
+        enableDragDropOnCard(view);
+        view.addEventHandler(BoardCardView.CARD_SELECTED, e -> handleCardInteraction(view.getCard()));
+    }
+
+    /**
+     * Gere l'interaction sur une carte (double-clic).
+     * BLOQUEE si le jeu est en pause ou termine.
      */
     private void handleCardInteraction(Card card) {
         if (engine.isGameOver()) return;
 
+        // *** PAUSE = AUCUNE INTERACTION ***
+        if (engine.isPaused()) {
+            comboInstructionLabel.setText("[PAUSE] Relancez le timer dans l'App Compagnon pour jouer !");
+            comboInstructionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #ff9800; -fx-font-weight: bold;");
+            return;
+        }
+
         switch (card.getType()) {
-            case NEUTRE:
-                handleFouille(card);
-                break;
+            case NEUTRE:   handleFouille(card);   break;
             case BLEU:
             case ROUGE:
-                // Les cartes BLEU et ROUGE sont utilisees uniquement pour la combinaison (drag & drop)
-                comboInstructionLabel.setText("Glissez cette carte dans la zone de combinaison pour l'utiliser.");
-                comboInstructionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #64ffda;");
+                // Double-clic = message d'aide uniquement, jamais de penalite
+                comboInstructionLabel.setText("[OBJET] Carte " + card.getId()
+                        + " — Glissez-la dans la zone du bas pour la combiner avec une autre.");
+                comboInstructionLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #64ffda;");
                 break;
-            case MACHINE:
-                handleMiniGame(card);
-                break;
-            case CODE:
-                handleCodeCard(card);
-                break;
-            case RESULTAT:
-                if (engine.isGameWon()) showVictory();
-                break;
+            case MACHINE:  handleMiniGame(card);  break;
+            case CODE:     handleCodeCard(card);  break;
+            case RESULTAT: if (engine.isGameWon()) showVictory(); break;
             case PENALITE:
                 comboInstructionLabel.setText("[ATTENTION] " + card.getDescription());
                 comboInstructionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #ff5555;");
@@ -305,18 +284,13 @@ public class TableJeuController {
         }
     }
 
-    /**
-     * Fouille d'une carte NEUTRE pour reveler des cartes cachees
-     */
     private void handleFouille(Card card) {
-        // Afficher et stocker l'indice s'il y en a un
         if (card.getHint() != null) {
             addDiscoveredHint(card);
             comboInstructionLabel.setText("[INDICE] " + card.getHint());
             comboInstructionLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #ffd54f;");
             updateIndicesDisplay();
-
-            // Si la carte n'a que des indices (pas de cartes a reveler), la retirer automatiquement
+            // Carte sans reveals : retire apres lecture de l'indice
             if (card.getRevealsCardIds() == null || card.getRevealsCardIds().length == 0) {
                 card.setVisible(false);
                 refreshTable();
@@ -326,47 +300,38 @@ public class TableJeuController {
 
         int result = engine.handleFouille(card.getId());
         if (result > 0) {
-            comboInstructionLabel.setText("[FOUILLE] Vous avez trouve " + result + " nouvelle(s) carte(s) !");
+            comboInstructionLabel.setText("[FOUILLE] " + result + " nouvelle(s) carte(s) decouverte(s) !");
             comboInstructionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #00e676;");
-            // Auto-retirer la carte fouillee apres avoir revele les sous-cartes
+            // La carte fouilee disparait du plateau (regles Unlock!)
             card.setVisible(false);
             refreshTable();
         } else if (result == -1 && card.getHint() == null) {
-            comboInstructionLabel.setText("Il n'y a plus rien a trouver ici... (-10s O2)");
+            comboInstructionLabel.setText("Rien de plus a trouver ici... (-10s O2)");
             comboInstructionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #ff9800;");
             updateOxygenDisplay();
         }
     }
 
-    /**
-     * Lance un mini-jeu pour une carte MACHINE
-     */
     private void handleMiniGame(Card card) {
-        String miniGameId = card.getMiniGameId();
-        if (miniGameId == null) return;
+        String id = card.getMiniGameId();
+        if (id == null) return;
 
-        // Verifier si deja complete
-        if (engine.getState().isMiniGameCompleted(miniGameId)) {
-            comboInstructionLabel.setText("[OK] Ce mini-jeu est deja reussi !");
+        if (engine.getState().isMiniGameCompleted(id)) {
+            comboInstructionLabel.setText("[OK] Mini-jeu deja reussi !");
             comboInstructionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #00e676;");
             return;
         }
 
-        // Cas special : enigme finale SOS
-        if ("final_sos".equals(miniGameId)) {
-            handleFinalSOS(card);
-            return;
-        }
+        if ("final_sos".equals(id)) { handleFinalSOS(card); return; }
 
-        // Callbacks pour succes/echec
         Runnable onSuccess = () -> {
-            Card revealed = engine.onMiniGameSuccess(miniGameId);
+            Card revealed = engine.onMiniGameSuccess(id);
             if (revealed != null) {
                 comboInstructionLabel.setText("[SUCCES] Mini-jeu reussi ! Carte " + revealed.getId() + " debloquee !");
                 comboInstructionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #00e676;");
             }
-            // Auto-retirer la carte MACHINE apres succes du mini-jeu
-            card.setVisible(false);
+            // Retirer la carte MACHINE via le deck (reference directe)
+            engine.getDeck().get(card.getId()).setVisible(false);
             refreshTable();
         };
 
@@ -375,8 +340,7 @@ public class TableJeuController {
             updateOxygenDisplay();
         };
 
-        // Lancer le mini-jeu correspondant
-        switch (miniGameId) {
+        switch (id) {
             case CablesMiniGame.GAME_ID:
                 new CablesMiniGameView(engine.getCablesMiniGame(), onSuccess, onFailure).show();
                 break;
@@ -389,9 +353,6 @@ public class TableJeuController {
         }
     }
 
-    /**
-     * Gere une carte CODE (demande le code via l'App Compagnon Swing)
-     */
     private void handleCodeCard(Card card) {
         if (card.requiresCode()) {
             comboInstructionLabel.setText("[CODE] Entrez le code sur l'App Compagnon pour la carte " + card.getId());
@@ -399,84 +360,81 @@ public class TableJeuController {
         }
     }
 
-    /**
-     * Gere l'enigme finale SOS (carte 50)
-     */
     private void handleFinalSOS(Card card) {
         String missing = engine.getMissingSosComponents();
         if (missing.contains("carte")) {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle("Station SOS");
-            alert.setHeaderText("Composants manquants !");
-            alert.setContentText("Il vous manque :\n" + missing +
-                    "\nCombinez les cartes BLEU + ROUGE correspondantes !");
-            alert.showAndWait();
+            Alert a = new Alert(Alert.AlertType.INFORMATION);
+            a.setTitle("Station SOS");
+            a.setHeaderText("Composants manquants !");
+            a.setContentText("Il vous manque :\n" + missing + "\nCombinez les cartes BLEU + ROUGE !");
+            a.showAndWait();
             return;
         }
-
-        boolean victory = engine.tryFinalSOS();
-        if (victory) {
-            refreshTable();
-            showVictory();
-        }
+        if (engine.tryFinalSOS()) { refreshTable(); showVictory(); }
     }
 
     // ================================================================
-    //  DRAG & DROP (Combinaison de cartes)
+    //  DRAG & DROP (combinaison de cartes)
     // ================================================================
 
     private void enableDragDropOnCard(BoardCardView view) {
         view.setOnDragDetected(event -> {
-            if (view.isFaceUp()) {
-                Dragboard db = view.startDragAndDrop(TransferMode.MOVE);
-                ClipboardContent content = new ClipboardContent();
-                content.putString(String.valueOf(view.getCard().getId()));
-                db.setContent(content);
-            }
+            // *** PAUSE = PAS DE DRAG ***
+            if (engine.isPaused() || !view.isFaceUp()) { event.consume(); return; }
+            Dragboard db = view.startDragAndDrop(TransferMode.MOVE);
+            ClipboardContent cc = new ClipboardContent();
+            cc.putString(String.valueOf(view.getCard().getId()));
+            db.setContent(cc);
             event.consume();
         });
     }
 
     private void setupDragAndDrop() {
         combinationZone.setOnDragOver(event -> {
-            if (event.getGestureSource() != combinationZone && event.getDragboard().hasString()) {
+            if (event.getGestureSource() != combinationZone && event.getDragboard().hasString())
                 event.acceptTransferModes(TransferMode.MOVE);
-            }
             event.consume();
         });
 
         combinationZone.setOnDragDropped(event -> {
-            boolean success = false;
+            boolean ok = false;
             Dragboard db = event.getDragboard();
+
             if (db.hasString()) {
+                // *** PAUSE = PAS DE COMBINAISON ***
+                if (engine.isPaused()) {
+                    comboInstructionLabel.setText("[PAUSE] Relancez le timer pour jouer !");
+                    comboInstructionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #ff9800; -fx-font-weight: bold;");
+                    event.setDropCompleted(false);
+                    event.consume();
+                    return;
+                }
+
                 int cardId = Integer.parseInt(db.getString());
-                Card droppedCard = engine.getDeck().get(cardId);
+                Card dropped = engine.getDeck().get(cardId);
 
                 if (cardToCombine1 == null) {
-                    cardToCombine1 = droppedCard;
-                    comboInstructionLabel.setText("Carte " + cardId + " en attente. Glissez la 2eme carte.");
+                    cardToCombine1 = dropped;
+                    comboInstructionLabel.setText("Carte " + cardId + " selectionnee. Glissez la 2eme carte.");
                     comboInstructionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #64ffda;");
                 } else {
-                    Card result = engine.combineCards(cardToCombine1.getId(), droppedCard.getId());
+                    Card result = engine.combineCards(cardToCombine1.getId(), dropped.getId());
                     if (result != null) {
-                        comboInstructionLabel.setText("[SUCCES] " + cardToCombine1.getId() + " + "
-                                + droppedCard.getId() + " = Carte " + result.getId() + " !");
+                        comboInstructionLabel.setText("[SUCCES] " + cardToCombine1.getId()
+                                + " + " + dropped.getId() + " = Carte " + result.getId() + " !");
                         comboInstructionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #00e676;");
-
-                        // Auto-retirer les deux cartes combinees de la table
                         cardToCombine1.setVisible(false);
-                        droppedCard.setVisible(false);
+                        dropped.setVisible(false);
                     } else {
-                        comboInstructionLabel.setText("[ERREUR] " + cardToCombine1.getId() + " + "
-                                + droppedCard.getId() + " = Combinaison invalide ! (-30s O2)");
+                        comboInstructionLabel.setText("[ERREUR] Combinaison invalide ! (-30s O2)");
                         comboInstructionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #ff5555;");
                     }
                     cardToCombine1 = null;
                     refreshTable();
                 }
-                success = true;
+                ok = true;
             }
-            event.setDropCompleted(success);
+            event.setDropCompleted(ok);
             event.consume();
         });
     }
@@ -486,43 +444,32 @@ public class TableJeuController {
     // ================================================================
 
     private void showVictory() {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("VICTOIRE !");
-        alert.setHeaderText("SOS ENVOYE - SECOURS EN ROUTE !");
-        int timeLeft = engine.getTimeRemaining();
-        int o2Left = engine.getOxygenRemaining();
-        alert.setContentText(
-                "Felicitations ! Vous avez sauve l'equipage !\n\n" +
-                "Temps restant : " + (timeLeft / 60) + "min " + (timeLeft % 60) + "s\n" +
-                "Oxygene restant : " + engine.getOxygenPercentage() + "%\n\n" +
-                "Score : " + calculateScore(timeLeft, o2Left) + " / 5 etoiles");
-        alert.showAndWait();
+        Alert a = new Alert(Alert.AlertType.INFORMATION);
+        a.setTitle("VICTOIRE !");
+        a.setHeaderText("SOS ENVOYE - SECOURS EN ROUTE !");
+        int t = engine.getTimeRemaining();
+        a.setContentText(
+            "Felicitations ! Vous avez sauve l'equipage !\n\n"
+            + "Temps restant : " + (t / 60) + "min " + (t % 60) + "s\n"
+            + "Oxygene restant : " + engine.getOxygenPercentage() + "%\n\n"
+            + "Score : " + calculateScore(t) + " / 5 etoiles");
+        a.showAndWait();
     }
 
     private void showGameOver() {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle("GAME OVER");
-        alert.setHeaderText("OXYGENE EPUISE !");
-        alert.setContentText("Vous n'avez pas reussi a envoyer le SOS a temps...\n" +
-                "La station Heliox-7 restera silencieuse pour toujours.");
-        alert.showAndWait();
+        Alert a = new Alert(Alert.AlertType.ERROR);
+        a.setTitle("GAME OVER");
+        a.setHeaderText("OXYGENE EPUISE !");
+        a.setContentText("Vous n'avez pas reussi a envoyer le SOS a temps...\n"
+                + "La station Heliox-7 restera silencieuse pour toujours.");
+        a.showAndWait();
     }
 
-    private int calculateScore(int timeLeft, int o2Left) {
+    private int calculateScore(int timeLeft) {
         if (timeLeft > 2400) return 5;
         if (timeLeft > 1800) return 4;
         if (timeLeft > 1200) return 3;
-        if (timeLeft > 600) return 2;
+        if (timeLeft > 600)  return 2;
         return 1;
-    }
-
-    // ================================================================
-    //  UTILITAIRES
-    // ================================================================
-
-    private String getCardShortName(Card card) {
-        String desc = card.getDescription();
-        if (desc.contains("\u2014")) return desc.substring(0, desc.indexOf("\u2014")).trim();
-        return desc;
     }
 }

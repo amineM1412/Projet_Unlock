@@ -142,25 +142,5 @@ public class GameState implements Serializable {
     public boolean isGameOver() {
         return gameWon || gameLost;
     }
-
-    // ========== SAUVEGARDE / CHARGEMENT ==========
-
-    public void saveToFile(String directory) throws IOException {
-        File file = new File(directory, SAVE_FILE);
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file))) {
-            oos.writeObject(this);
-        }
-    }
-
-    public static GameState loadFromFile(String directory) throws IOException, ClassNotFoundException {
-        File file = new File(directory, SAVE_FILE);
-        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
-            return (GameState) ois.readObject();
-        }
-    }
-
-    public static boolean saveExists(String directory) {
-        return new File(directory, SAVE_FILE).exists();
-    }
     
 }
