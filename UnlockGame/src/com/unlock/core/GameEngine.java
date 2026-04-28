@@ -5,9 +5,7 @@ import com.unlock.model.CardType;
 import com.unlock.model.GameState;
 import com.unlock.model.Inventory;
 
-import java.io.IOException;
 import java.io.Serializable;
-
 import java.util.Map;
 
 /**
@@ -23,14 +21,11 @@ public class GameEngine implements Serializable {
     private GameState state;
 
     // Mini-jeux (stockés séparément pour accès rapide)
-    private CablesMiniGame cablesMiniGame;
-    private RadioMiniGame radioMiniGame;
-    private PipesMiniGame pipesMiniGame;
+    private final CablesMiniGame cablesMiniGame;
+    private final RadioMiniGame radioMiniGame;
+    private final PipesMiniGame pipesMiniGame;
 
-    // Répertoire de sauvegarde
-    private String saveDirectory = ".";
-
-    // Pause — transient : pas sérialisé
+    // Pause — transient : pas seriialise
     private transient boolean paused = false;
 
     public GameEngine() {
@@ -94,9 +89,12 @@ public class GameEngine implements Serializable {
 
         // Carte 17 — Lieu
         Card c17 = new Card(17, CardType.NEUTRE, "Salle de communication — Antenne intérieure, console radio, oscilloscope.", 2);
-        c17.setHint("La console radio semble fonctionnelle... (voir carte 25)");
-        c17.setRevealsCardIds(new int[]{19, 36}); // Photo equipage + Schema de cablage trouves ici
+        c17.setHint("La console radio est opérationnelle ! Mini-jeu radio disponible (carte 25).");
+        // Le mini-jeu radio (carte 25) est accessible directement via la fouille de cette salle.
+        // Carte 7 (Cristal) est réservée au SOS final — elle ne doit PAS être utilisée en combinaison.
+        c17.setRevealsCardIds(new int[]{19, 36, 25});
         deck.put(17, c17);
+
 
         // Carte 8 — Objet Bleu
         Card c8 = new Card(8, CardType.BLEU, "Tournevis isolé — Tournevis à embout spécial dans une boîte flottante.", 2);
@@ -267,17 +265,17 @@ public class GameEngine implements Serializable {
         // Changer d'acte si la carte fouillée introduit un nouvel acte
         if (cardId == 45) state.setCurrentAct(2);
 
-        // Acte 3 via carte 38 : seulement si le chemin radio est AUSSI termine
-        // (carte 40 = Kit SOS doit etre visible, sinon on reste en Acte 2)
+        // Acte 3 via carte 38 : chemin cables done. Verifie si chemin radio aussi done
+        // (carte 40 visible OU ses resultats 5/20 visibles = carte 40 deja fouilee)
         if (cardId == 38) {
             Card c40 = state.getCard(40);
-            if (c40 != null && c40.isVisible()) {
-                state.setCurrentAct(3);
-            }
-            // Sinon : cartes 15,9,26 revelees mais on reste Acte 2 (pas de positions = pas affichees)
+            Card c5  = state.getCard(5);
+            Card c20 = state.getCard(20);
+            boolean radioOk = (c40 != null && c40.isVisible())
+                           || (c5  != null && c5.isVisible())
+                           || (c20 != null && c20.isVisible());
+            if (radioOk) state.setCurrentAct(3);
         }
-
-        // Acte 3 toujours valide via carte 15
         if (cardId == 15) state.setCurrentAct(3);
 
         return newCards;
@@ -297,17 +295,24 @@ public class GameEngine implements Serializable {
 
         if (c1 != null && c2 != null) {
             boolean hasBlue = c1.getType() == CardType.BLEU || c2.getType() == CardType.BLEU;
-            boolean hasRed = c1.getType() == CardType.ROUGE || c2.getType() == CardType.ROUGE;
+            boolean hasRed  = c1.getType() == CardType.ROUGE || c2.getType() == CardType.ROUGE;
 
             if (hasBlue && hasRed) {
                 int sum = c1.getId() + c2.getId();
                 Card resultCard = state.getCard(sum);
 
                 if (resultCard != null && !resultCard.isVisible()) {
+                    // PROTECTION : ne pas re-reveler une carte machine deja completee
+                    // (ex: 5+20=25 alors que le mini-jeu radio est deja fini)
+                    if (resultCard.getMiniGameId() != null
+                            && state.isMiniGameCompleted(resultCard.getMiniGameId())) {
+                        applyPenalty(30);
+                        showPenaltyCard(27);
+                        return null;
+                    }
                     resultCard.setVisible(true);
                     return resultCard;
                 } else if (resultCard != null && resultCard.isVisible()) {
-                    // Carte déjà visible → pénalité
                     applyPenalty(30);
                     showPenaltyCard(27);
                     return null;
@@ -315,7 +320,6 @@ public class GameEngine implements Serializable {
             }
         }
 
-        // Combinaison invalide → pénalité de 30 secondes
         applyPenalty(30);
         return null;
     }
@@ -344,14 +348,16 @@ public class GameEngine implements Serializable {
                 resultCard.setVisible(true);
                 machine.setVisible(false);
 
-                // Si le code revele la carte 40 (Kit SOS) = chemin radio termine
-                // Verifier si le chemin cables est aussi fait (carte 15 visible = fouille 38 faite)
-                // Si oui : transition vers Acte 3
+                // Si le code revele la carte 40 = chemin radio termine
+                // Verifier si chemin cables aussi fait (cartes 15,9 ou 26 visibles)
                 if (resultId == 40) {
                     Card c15 = state.getCard(15);
-                    if (c15 != null && c15.isVisible()) {
-                        state.setCurrentAct(3);
-                    }
+                    Card c9  = state.getCard(9);
+                    Card c26 = state.getCard(26);
+                    boolean cablesOk = (c15 != null && c15.isVisible())
+                                   || (c9  != null && c9.isVisible())
+                                   || (c26 != null && c26.isVisible());
+                    if (cablesOk) state.setCurrentAct(3);
                 }
 
                 return resultCard;
@@ -508,8 +514,8 @@ public class GameEngine implements Serializable {
     public void tick() {
         state.reduceTime(1);
         state.reduceOxygen(1);
-
-        if (state.isOxygenDepleted()) {
+        // Fin de partie si oxygene OU temps ecoule
+        if (state.isOxygenDepleted() || state.getTimeRemaining() <= 0) {
             state.setGameLost(true);
         }
     }
@@ -522,26 +528,6 @@ public class GameEngine implements Serializable {
         if (penalty != null) {
             penalty.setVisible(true);
         }
-    }
-
-    // ================================================================
-    //  SAUVEGARDE / CHARGEMENT
-    // ================================================================
-
-    public void saveGame() throws IOException {
-        state.saveToFile(saveDirectory);
-    }
-
-    public void loadGame() throws IOException, ClassNotFoundException {
-        state = GameState.loadFromFile(saveDirectory);
-    }
-
-    public boolean hasSaveFile() {
-        return GameState.saveExists(saveDirectory);
-    }
-
-    public void setSaveDirectory(String dir) {
-        this.saveDirectory = dir;
     }
 
     // ================================================================

@@ -39,10 +39,10 @@ public class GameBoardPane extends Pane {
 
     /** IDs des cartes de chaque acte (ordre d'affichage dans la grille) */
     private static final int[][] ACT_CARD_IDS = {
-        {},                                                                    // index 0 inutilise
-        {10, 12, 13, 6, 24, 30, 45},                                           // Acte 1 — 7 cartes (45 = carte transition, visible apres code 352)
-        {14, 17, 8, 21, 7, 18, 11, 19, 36, 29, 25, 38, 33, 40, 27},           // Acte 2 — 15 cartes (sans 45 qui disparait apres transition)
-        {15, 9, 26, 35, 3, 22, 16, 5, 20, 44, 42, 50, 99}                     // Acte 3 — 13 cartes
+        {},                                                                            // index 0 inutilise
+        {10, 12, 13, 6, 24, 30, 45},                                                   // Acte 1 — 7 cartes
+        {14, 17, 8, 21, 7, 18, 11, 19, 36, 29, 25, 38, 33, 40, 27},                   // Acte 2 — 15 cartes
+        {15, 9, 26, 35, 3, 22, 16, 7, 5, 20, 40, 44, 42, 50, 99}                      // Acte 3 — 15 cartes (7,5,20,40 persistents depuis acte 2)
     };
 
     /** Nombre de colonnes par acte */
@@ -398,7 +398,8 @@ public class GameBoardPane extends Pane {
     //  METHODE LEGACY (gardee pour compatibilite)
     // ================================================================
 
-    /** @deprecated Remplace par transitionToAct(). */
+    /**
+     * @param actNumber *  @deprecated Remplace par transitionToAct(). */
     public void highlightZone(int actNumber) {
         // No-op : une seule zone affichee a la fois
     }

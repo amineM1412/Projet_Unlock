@@ -167,7 +167,6 @@ public class PipesMiniGameView {
 
         gc.setStroke(Color.web("#64ffda"));
         gc.setLineWidth(pipeWidth);
-        gc.setLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
 
         // Dessiner les "bras" du tuyau vers le centre
         if (dirs[0]) gc.strokeLine(cx, y + 2, cx, cy);          // haut

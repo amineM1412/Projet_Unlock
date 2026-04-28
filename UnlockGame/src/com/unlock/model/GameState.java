@@ -1,6 +1,6 @@
 package com.unlock.model;
 
-import java.io.*;
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -12,7 +12,6 @@ import java.util.Set;
 public class GameState implements Serializable {
 
     private static final long serialVersionUID = 1L;
-    private static final String SAVE_FILE = "unlock_save.dat";
 
     private HashMap<Integer, Card> deck;
     private Inventory inventory;
@@ -27,7 +26,7 @@ public class GameState implements Serializable {
         this.deck = new HashMap<>();
         this.inventory = new Inventory();
         this.oxygenRemaining = 2400;     // 40 minutes
-        this.timeRemaining = 3600;       // 60 minutes
+        this.timeRemaining = 2400;       // 40 minutes
         this.currentAct = 1;
         this.completedMiniGames = new HashSet<>();
         this.gameWon = false;

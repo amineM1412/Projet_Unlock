@@ -7,8 +7,7 @@ import javafx.event.EventType;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
+
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -91,24 +90,9 @@ public class CardView extends VBox {
         typeLabel.setMaxWidth(Double.MAX_VALUE);
         typeLabel.setAlignment(Pos.CENTER);
 
-        // Zone centrale : Image ou Texte
-        if (card.getImagePath() != null && !card.getImagePath().isEmpty()) {
-            try {
-                String fullPath = "/com/unlock/resources/images/" + card.getImagePath();
-                Image img = new Image(getClass().getResourceAsStream(fullPath));
-                ImageView imgView = new ImageView(img);
-                imgView.setFitWidth(110);
-                imgView.setFitHeight(110);
-                imgView.setPreserveRatio(true);
-                this.getChildren().addAll(idLabel, typeLabel, imgView);
-            } catch (Exception ex) {
-                Label descLabel = createDescriptionLabel(card.getDescription());
-                this.getChildren().addAll(idLabel, typeLabel, descLabel);
-            }
-        } else {
-            Label descLabel = createDescriptionLabel(card.getDescription());
-            this.getChildren().addAll(idLabel, typeLabel, descLabel);
-        }
+        // Zone centrale : description textuelle
+        Label descLabel = createDescriptionLabel(card.getDescription());
+        this.getChildren().addAll(idLabel, typeLabel, descLabel);
 
         final String finalColorHex = colorHex;
 

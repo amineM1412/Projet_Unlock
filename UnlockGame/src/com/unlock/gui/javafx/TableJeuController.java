@@ -80,8 +80,9 @@ public class TableJeuController {
         boardContainer.setPrefSize(GameBoardPane.BOARD_WIDTH, GameBoardPane.BOARD_HEIGHT);
         boardContainer.setMinSize(GameBoardPane.BOARD_WIDTH, GameBoardPane.BOARD_HEIGHT);
 
+        // Seules les cartes visibles ET ayant une position dans le layout Acte 1 sont affichees
         for (Card card : engine.getDeck().values()) {
-            if (card.isVisible() && card.getActNumber() == knownAct) {
+            if (card.isVisible() && gameBoard.hasPositionForCard(card.getId())) {
                 BoardCardView view = gameBoard.addOrUpdateCard(card);
                 if (view != null) {
                     attachHandlers(view);
@@ -118,8 +119,10 @@ public class TableJeuController {
     public void refreshTable() {
         if (engine == null || gameBoard == null) return;
 
-        if (engine.isGameWon())  { showVictory();  return; }
-        if (engine.isGameLost()) { showGameOver(); return; }
+        // Quand le jeu est fini (timer a 0, oxygene vide, ou victoire) :
+        // afficher l'ecran de fin et stopper TOUTE interaction
+        if (engine.isGameWon())  { showVictory();  refreshTimeline.stop(); return; }
+        if (engine.isGameLost()) { showGameOver(); refreshTimeline.stop(); return; }
 
         int currentAct = engine.getCurrentAct();
 
@@ -133,11 +136,11 @@ public class TableJeuController {
         } else {
             // Detecter les nouvelles cartes visibles dans le layout de l'acte courant
             for (Card card : engine.getDeck().values()) {
-                // Ignorer les cartes qui n'ont pas de position dans l'acte affiche
                 if (!gameBoard.hasPositionForCard(card.getId())) continue;
 
                 if (card.isVisible() && !knownVisibleCards.contains(card.getId())) {
                     // Nouvelle carte decouverte !
+                    autoCollectSosComponent(card);
                     BoardCardView view = gameBoard.getCardView(card.getId());
                     if (view != null) {
                         view.flipToFront();
@@ -148,7 +151,6 @@ public class TableJeuController {
                     knownVisibleCards.add(card.getId());
 
                 } else if (!card.isVisible() && knownVisibleCards.contains(card.getId())) {
-                    // Carte retiree
                     gameBoard.removeCard(card.getId());
                     knownVisibleCards.remove(card.getId());
                 }
@@ -167,13 +169,24 @@ public class TableJeuController {
      */
     private void addVisibleCardsOfCurrentAct() {
         for (Card card : engine.getDeck().values()) {
-            // Seulement les cartes avec une position dans l'acte courant
             if (card.isVisible() && gameBoard.hasPositionForCard(card.getId())
                     && !knownVisibleCards.contains(card.getId())) {
+                autoCollectSosComponent(card);
                 BoardCardView view = gameBoard.addCardWithFlip(card);
                 if (view != null) attachHandlers(view);
                 knownVisibleCards.add(card.getId());
             }
+        }
+    }
+
+    /**
+     * Auto-collecte les composants SOS (cartes 5, 7, 20) dans l'inventaire
+     * des qu'ils deviennent visibles. Card 50 verifie l'inventaire pour valider.
+     */
+    private void autoCollectSosComponent(Card card) {
+        int id = card.getId();
+        if ((id == 5 || id == 7 || id == 20) && !engine.getInventory().hasItem(id)) {
+            engine.getInventory().addItem(card);
         }
     }
 
@@ -290,7 +303,6 @@ public class TableJeuController {
             comboInstructionLabel.setText("[INDICE] " + card.getHint());
             comboInstructionLabel.setStyle("-fx-font-size: 13px; -fx-text-fill: #ffd54f;");
             updateIndicesDisplay();
-            // Carte sans reveals : retire apres lecture de l'indice
             if (card.getRevealsCardIds() == null || card.getRevealsCardIds().length == 0) {
                 card.setVisible(false);
                 refreshTable();
@@ -300,9 +312,14 @@ public class TableJeuController {
 
         int result = engine.handleFouille(card.getId());
         if (result > 0) {
-            comboInstructionLabel.setText("[FOUILLE] " + result + " nouvelle(s) carte(s) decouverte(s) !");
+            // Afficher les IDs des cartes decouvertes (utile pour carte 38)
+            StringBuilder ids = new StringBuilder();
+            if (card.getRevealsCardIds() != null) {
+                for (int id : card.getRevealsCardIds()) ids.append(id).append(" ");
+            }
+            comboInstructionLabel.setText("[FOUILLE] " + result + " carte(s) decouverte(s) !"
+                    + (ids.length() > 0 ? " (IDs: " + ids.toString().trim() + ")" : ""));
             comboInstructionLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #00e676;");
-            // La carte fouilee disparait du plateau (regles Unlock!)
             card.setVisible(false);
             refreshTable();
         } else if (result == -1 && card.getHint() == null) {

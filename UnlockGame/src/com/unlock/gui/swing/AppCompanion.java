@@ -86,16 +86,10 @@ public class AppCompanion extends JFrame {
         JButton stopBtn = createStyledButton("Pause", new Color(255, 152, 0));
 
         startBtn.addActionListener(e -> {
-            if (clockTimer != null && !clockTimer.isRunning()) {
-                clockTimer.start();
-                engine.setPaused(false);  // Deblocage des interactions
-            }
+            if (clockTimer != null && !clockTimer.isRunning()) clockTimer.start();
         });
         stopBtn.addActionListener(e -> {
-            if (clockTimer != null && clockTimer.isRunning()) {
-                clockTimer.stop();
-                engine.setPaused(true);   // Blocage des interactions (anti-triche)
-            }
+            if (clockTimer != null && clockTimer.isRunning()) clockTimer.stop();
         });
 
         timerBtnPanel.add(startBtn);
@@ -212,17 +206,11 @@ public class AppCompanion extends JFrame {
         String input = inputField.getText();
         if (input.isEmpty()) return;
 
-        // Anti-triche : impossible d'entrer un code si le timer est en pause
-        if (engine.isPaused()) {
-            statusLabel.setText("[PAUSE] Relancez le timer avant d'entrer un code !");
-            statusLabel.setForeground(new Color(255, 152, 0));
-            inputField.setText("");
-            return;
-        }
-
         if (selectedMachineId == -1) {
+            // ETAPE 1 : Valider le numero de carte
             validateCardNumber(input);
         } else {
+            // ETAPE 2 : Valider le code
             validateCode(input);
         }
     }
